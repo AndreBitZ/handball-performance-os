@@ -9,8 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@supabase/ssr": "latest",
-    "@supabase/supabase-js": "latest",
+    "dexie": "latest",
     "lucide-react": "latest",
     "next": "latest",
     "react": "latest",
