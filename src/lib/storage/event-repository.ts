@@ -13,10 +13,22 @@ export async function updateMatchEvent(id: string, data: EventEditorData) {
 
 export async function getMatchPlayers(matchId: string): Promise<Player[]> {
   if (!db) return []
+
   const database = db
   const match = await database.matches.get(matchId)
   if (!match) return []
-  const assignments = await database.playerTeamSeasons.where('teamId').equals(match.teamId).toArray()
-  const players = await Promise.all(assignments.map(a => database.players.get(a.playerId)))
-  return players.filter((player): player is Player => Boolean(player))
+
+  const assignments = await database.playerTeamSeasons
+    .where('teamId')
+    .equals(match.teamId)
+    .toArray()
+
+  const players: Player[] = []
+
+  for (const assignment of assignments) {
+    const player = await database.players.get(assignment.playerId)
+    if (player) players.push(player)
+  }
+
+  return players
 }
