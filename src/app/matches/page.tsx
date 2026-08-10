@@ -1,10 +1,9 @@
 'use client';
 
+import Link from 'next/link';
 import { FormEvent, useEffect, useState } from 'react';
 import { db } from '@/lib/storage/db';
 import type { Competition, Match, Season, Team } from '@/lib/storage/types';
-
-function makeId() { return crypto.randomUUID(); }
 
 export default function MatchesPage() {
   const [teams, setTeams] = useState<Team[]>([]);
@@ -22,7 +21,10 @@ export default function MatchesPage() {
 
   async function refresh() {
     if (!db) return;
-    const [t, s, c, m] = await Promise.all([db.teams.toArray(), db.seasons.toArray(), db.competitions.toArray(), db.matches.orderBy('date').reverse().toArray()]);
+    const [t, s, c, m] = await Promise.all([
+      db.teams.toArray(), db.seasons.toArray(), db.competitions.toArray(),
+      db.matches.orderBy('date').reverse().toArray(),
+    ]);
     setTeams(t); setSeasons(s); setCompetitions(c); setMatches(m);
     if (!teamId && t[0]) setTeamId(t[0].id);
     if (!seasonId && s[0]) setSeasonId(s[0].id);
@@ -34,17 +36,21 @@ export default function MatchesPage() {
     e.preventDefault();
     if (!db || !teamId || !seasonId || !opponentName.trim() || !date) return;
     const now = new Date().toISOString();
-    await db.matches.add({ id: makeId(), seasonId, competitionId: competitionId || undefined, teamId, opponentName: opponentName.trim(), date, venue: venue.trim() || undefined, homeAway, status: 'PLANNED', createdAt: now, updatedAt: now });
+    await db.matches.add({
+      id: crypto.randomUUID(), seasonId, competitionId: competitionId || undefined, teamId,
+      opponentName: opponentName.trim(), date, venue: venue.trim() || undefined,
+      homeAway, status: 'PLANNED', createdAt: now, updatedAt: now,
+    });
     setOpponentName(''); setVenue(''); setMessage('Jogo criado.'); await refresh();
   }
 
   const competitionOptions = competitions.filter(c => !seasonId || c.seasonId === seasonId);
 
   return <main style={{ maxWidth: 1100, margin: '0 auto', padding: 24, fontFamily: 'system-ui' }}>
-    <p style={{ margin: 0, color: '#667085', fontSize: 14 }}>HANDBALL PERFORMANCE OS</p>
+    <Link href="/">← Dashboard</Link>
+    <p style={{ margin: '18px 0 0', color: '#667085', fontSize: 14 }}>HANDBALL PERFORMANCE OS</p>
     <h1>🤾 Jogos</h1>
-    <p style={{ color: '#667085' }}>Cria e consulta jogos. Os dados ficam guardados localmente.</p>
-
+    <p style={{ color: '#667085' }}>Calendário e preparação dos jogos. Tudo guardado localmente neste dispositivo.</p>
     <form onSubmit={createMatch} style={{ border: '1px solid #ddd', borderRadius: 16, padding: 20, marginBottom: 28 }}>
       <h2>Novo jogo</h2>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 12 }}>
@@ -59,7 +65,6 @@ export default function MatchesPage() {
       <button type="submit" style={{ marginTop: 14, padding: '10px 16px' }}>Criar jogo</button>
       {message && <p>{message}</p>}
     </form>
-
     <section><h2>Jogos</h2>{matches.length === 0 ? <p style={{ color: '#667085' }}>Ainda não existem jogos.</p> : matches.map(m => <article key={m.id} style={{ border: '1px solid #eee', borderRadius: 12, padding: 14, marginBottom: 10 }}><strong>{teams.find(t => t.id === m.teamId)?.name ?? 'Equipa'} vs {m.opponentName}</strong><div style={{ color: '#667085', marginTop: 4 }}>{new Date(m.date).toLocaleString('pt-PT')} · {m.homeAway === 'HOME' ? 'Casa' : m.homeAway === 'AWAY' ? 'Fora' : 'Neutro'}{m.venue ? ` · ${m.venue}` : ''}</div></article>)}</section>
   </main>;
 }
