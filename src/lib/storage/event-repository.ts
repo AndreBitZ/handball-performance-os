@@ -1,6 +1,6 @@
-import { db } from './db'
-import type { MatchEvent } from './types'
+import type { MatchEvent, Player } from './types'
 import type { EventEditorData } from './event-editor'
+import { db } from './db'
 
 export async function updateMatchEvent(id: string, data: EventEditorData) {
   if (!db) throw new Error('Local database is only available in the browser.')
@@ -11,11 +11,11 @@ export async function updateMatchEvent(id: string, data: EventEditorData) {
   return updated
 }
 
-export async function getMatchPlayers(matchId: string) {
+export async function getMatchPlayers(matchId: string): Promise<Player[]> {
   if (!db) return []
   const match = await db.matches.get(matchId)
   if (!match) return []
   const assignments = await db.playerTeamSeasons.where('teamId').equals(match.teamId).toArray()
   const players = await Promise.all(assignments.map(a => db.players.get(a.playerId)))
-  return players.filter(Boolean)
+  return players.filter((player): player is Player => Boolean(player))
 }
