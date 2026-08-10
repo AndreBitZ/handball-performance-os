@@ -1,18 +1,95 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { Plus, Trash2, CalendarRange } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Plus, Trash2, CalendarRange, Trophy } from 'lucide-react'
 import { db } from '../../src/lib/storage/db'
 import { createId } from '../../src/lib/storage/id'
-import type { Season } from '../../src/lib/storage/types'
+import type { Competition, Season } from '../../src/lib/storage/types'
 import '../dashboard.css'
 
 export default function SeasonsPage() {
   const [seasons, setSeasons] = useState<Season[]>([])
+  const [competitions, setCompetitions] = useState<Competition[]>([])
   const [name, setName] = useState('2026/27')
-  async function load() { if (db) setSeasons(await db.seasons.orderBy('name').reverse().toArray()) }
-  useEffect(() => { load() }, [])
-  async function add(e: React.FormEvent) { e.preventDefault(); if (!db || !name.trim()) return; await db.seasons.add({ id: createId(), name: name.trim(), active: true }); setName(''); await load() }
-  async function remove(id: string) { if (db && window.confirm('Apagar esta época?')) { await db.seasons.delete(id); await load() } }
-  return <main className="content standalonePage"><header className="topbar"><div><p className="eyebrow">PLANEAMENTO</p><h1>Épocas</h1></div></header><section className="section"><form onSubmit={add} className="localForm"><input value={name} onChange={e => setName(e.target.value)} placeholder="Ex.: 2026/27"/><button><Plus size={17}/> Criar época</button></form><div className="localList">{seasons.length === 0 && <div className="emptyState"><CalendarRange size={30}/><strong>Nenhuma época criada</strong></div>}{seasons.map(s => <article className="localRow" key={s.id}><div><strong>{s.name}</strong><span>{s.active ? 'Ativa' : 'Concluída'}</span></div><button className="iconButton" onClick={() => remove(s.id)}><Trash2 size={17}/></button></article>)}</div></section></main>
+  const [competitionName, setCompetitionName] = useState('')
+  const [competitionSeasonId, setCompetitionSeasonId] = useState('')
+
+  async function load() {
+    if (!db) return
+    const [nextSeasons, nextCompetitions] = await Promise.all([
+      db.seasons.orderBy('name').reverse().toArray(),
+      db.competitions.orderBy('name').toArray(),
+    ])
+    setSeasons(nextSeasons)
+    setCompetitions(nextCompetitions)
+    if (!competitionSeasonId && nextSeasons[0]) setCompetitionSeasonId(nextSeasons[0].id)
+  }
+
+  useEffect(() => { void load() }, [])
+
+  const competitionsBySeason = useMemo(() => {
+    const result = new Map<string, Competition[]>()
+    for (const competition of competitions) {
+      const list = result.get(competition.seasonId) ?? []
+      list.push(competition)
+      result.set(competition.seasonId, list)
+    }
+    return result
+  }, [competitions])
+
+  async function addSeason(e: React.FormEvent) {
+    e.preventDefault()
+    if (!db || !name.trim()) return
+    await db.seasons.add({ id: createId(), name: name.trim(), active: true })
+    setName('')
+    await load()
+  }
+
+  async function addCompetition(e: React.FormEvent) {
+    e.preventDefault()
+    if (!db || !competitionName.trim() || !competitionSeasonId) return
+    await db.competitions.add({ id: createId(), name: competitionName.trim(), seasonId: competitionSeasonId })
+    setCompetitionName('')
+    await load()
+  }
+
+  async function removeSeason(id: string) {
+    if (!db || !window.confirm('Apagar esta época?')) return
+    await db.seasons.delete(id)
+    const related = await db.competitions.where('seasonId').equals(id).toArray()
+    if (related.length) await db.competitions.bulkDelete(related.map(c => c.id))
+    await load()
+  }
+
+  async function removeCompetition(id: string) {
+    if (db && window.confirm('Apagar esta competição?')) {
+      await db.competitions.delete(id)
+      await load()
+    }
+  }
+
+  return <main className="content standalonePage">
+    <header className="topbar"><div><p className="eyebrow">PLANEAMENTO</p><h1>Épocas & Competições</h1><p>Temporadas e competições guardadas localmente.</p></div></header>
+    <section className="section">
+      <form onSubmit={addSeason} className="localForm">
+        <input value={name} onChange={e => setName(e.target.value)} placeholder="Ex.: 2026/27" required />
+        <button type="submit"><Plus size={17}/> Criar época</button>
+      </form>
+      <form onSubmit={addCompetition} className="localForm" style={{ marginTop: 12 }}>
+        <select value={competitionSeasonId} onChange={e => setCompetitionSeasonId(e.target.value)} required aria-label="Época da competição">
+          <option value="">Época</option>
+          {seasons.map(season => <option key={season.id} value={season.id}>{season.name}</option>)}
+        </select>
+        <input value={competitionName} onChange={e => setCompetitionName(e.target.value)} placeholder="Nome da competição" required />
+        <button type="submit"><Trophy size={17}/> Criar competição</button>
+      </form>
+      <div className="localList">
+        {seasons.length === 0 && <div className="emptyState"><CalendarRange size={30}/><strong>Nenhuma época criada</strong><span>Cria primeiro uma época e depois associa-lhe competições.</span></div>}
+        {seasons.map(season => <article className="localRow" key={season.id}>
+          <div><strong>{season.name}</strong><span>{season.active ? 'Ativa' : 'Concluída'}</span>{(competitionsBySeason.get(season.id) ?? []).map(competition => <small key={competition.id} style={{ display: 'block', marginTop: 4 }}>🏆 {competition.name} <button type="button" className="iconButton" onClick={() => removeCompetition(competition.id)} aria-label={`Apagar ${competition.name}`}><Trash2 size={14}/></button></small>)}</div>
+          <button className="iconButton" onClick={() => removeSeason(season.id)} aria-label={`Apagar época ${season.name}`}><Trash2 size={17}/></button>
+        </article>)}
+      </div>
+    </section>
+  </main>
 }
