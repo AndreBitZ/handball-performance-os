@@ -96,6 +96,11 @@ export interface MatchEvent {
   type: string;
   teamId?: UUID;
   playerId?: UUID;
+  zone?: string;
+  distance?: string;
+  shotType?: string;
+  result?: string;
+  attackPhase?: string;
   notes?: string;
   tags?: string[];
   createdAt: string;
