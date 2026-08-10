@@ -1,6 +1,7 @@
 'use client';
 
-import { FormEvent, useEffect, useState } from 'react';
+import { type FormEvent, useEffect, useState } from 'react';
+import type { CSSProperties } from 'react';
 import { db } from '@/lib/storage/db';
 import type { Player, Team } from '@/lib/storage/types';
 
@@ -150,7 +151,7 @@ export default function ManagementPage() {
   );
 }
 
-const styles: Record<string, React.CSSProperties> = {
+const styles: Record<string, CSSProperties> = {
   page: { minHeight: '100vh', padding: '32px', background: '#f5f7fa', color: '#172033', fontFamily: 'system-ui, -apple-system, sans-serif' },
   header: { maxWidth: 1180, margin: '0 auto 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 20 },
   eyebrow: { fontSize: 12, fontWeight: 800, letterSpacing: 1.5, color: '#526174' },
