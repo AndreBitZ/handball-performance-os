@@ -5,6 +5,7 @@ import Link from 'next/link';
 const cards = [
   { href: '/management', icon: '👥', title: 'Gestão', text: 'Equipas e jogadores' },
   { href: '/seasons', icon: '📅', title: 'Épocas & Competições', text: 'Épocas e competições' },
+  { href: '/matches', icon: '🤾', title: 'Jogos', text: 'Criar e consultar jogos' },
 ];
 
 export default function HomePage() {
@@ -30,7 +31,7 @@ export default function HomePage() {
 
       <section style={{ marginTop: 28, padding: 20, border: '1px solid #ddd', borderRadius: 16 }}>
         <h2 style={{ marginTop: 0 }}>Próximos módulos</h2>
-        <p style={{ marginBottom: 0, color: '#667085' }}>🤾 Jogos · 🎥 Vídeo · 📊 Estatísticas</p>
+        <p style={{ marginBottom: 0, color: '#667085' }}>🎥 Vídeo · 📊 Estatísticas · ⏱️ Live Match</p>
       </section>
     </main>
   );
