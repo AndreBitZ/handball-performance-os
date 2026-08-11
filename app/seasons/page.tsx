@@ -1,28 +1,36 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Trash2, CalendarRange, Trophy } from 'lucide-react'
+import { Plus, Trash2, CalendarRange, Trophy, BarChart3 } from 'lucide-react'
 import { db } from '../../src/lib/storage/db'
 import { createId } from '../../src/lib/storage/id'
-import type { Competition, Season } from '../../src/lib/storage/types'
+import type { Competition, Season, Team } from '../../src/lib/storage/types'
+import PlayerStatsView from './player-stats-view'
 import '../dashboard.css'
 
 export default function SeasonsPage() {
   const [seasons, setSeasons] = useState<Season[]>([])
   const [competitions, setCompetitions] = useState<Competition[]>([])
+  const [teams, setTeams] = useState<Team[]>([])
   const [name, setName] = useState('2026/27')
   const [competitionName, setCompetitionName] = useState('')
   const [competitionSeasonId, setCompetitionSeasonId] = useState('')
+  const [statsSeasonId, setStatsSeasonId] = useState('')
+  const [statsTeamId, setStatsTeamId] = useState('')
 
   async function load() {
     if (!db) return
-    const [nextSeasons, nextCompetitions] = await Promise.all([
+    const [nextSeasons, nextCompetitions, nextTeams] = await Promise.all([
       db.seasons.orderBy('name').reverse().toArray(),
       db.competitions.orderBy('name').toArray(),
+      db.teams.orderBy('name').toArray(),
     ])
     setSeasons(nextSeasons)
     setCompetitions(nextCompetitions)
+    setTeams(nextTeams)
     if (!competitionSeasonId && nextSeasons[0]) setCompetitionSeasonId(nextSeasons[0].id)
+    if (!statsSeasonId && nextSeasons[0]) setStatsSeasonId(nextSeasons[0].id)
+    if (!statsTeamId && nextTeams[0]) setStatsTeamId(nextTeams[0].id)
   }
 
   useEffect(() => { void load() }, [])
@@ -90,6 +98,14 @@ export default function SeasonsPage() {
           <button className="iconButton" onClick={() => removeSeason(season.id)} aria-label={`Apagar época ${season.name}`}><Trash2 size={17}/></button>
         </article>)}
       </div>
+    </section>
+    <section className="section">
+      <div className="sectionHeader"><div><p className="eyebrow">PERFORMANCE</p><h2><BarChart3 size={20}/> Estatísticas da época</h2><p>Seleciona a época e a equipa para consultar o acumulado individual.</p></div></div>
+      <div className="localForm">
+        <select value={statsSeasonId} onChange={e => setStatsSeasonId(e.target.value)} aria-label="Época das estatísticas"><option value="">Época</option>{seasons.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select>
+        <select value={statsTeamId} onChange={e => setStatsTeamId(e.target.value)} aria-label="Equipa das estatísticas"><option value="">Equipa</option>{teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
+      </div>
+      {statsSeasonId && statsTeamId ? <PlayerStatsView seasonId={statsSeasonId} teamId={statsTeamId} /> : <div className="emptyState"><strong>Seleciona uma época e uma equipa</strong></div>}
     </section>
   </main>
 }
