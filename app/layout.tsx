@@ -1,6 +1,8 @@
 import type { Metadata } from 'next'
 import './globals.css'
+import './dashboard.css'
 import BackButton from './components/back-button'
+import AppShell from './components/app-shell'
 
 export const metadata: Metadata = {
   title: 'Handball Performance OS',
@@ -11,8 +13,10 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="pt-PT">
       <body>
-        <BackButton />
-        {children}
+        <AppShell>
+          <BackButton />
+          {children}
+        </AppShell>
       </body>
     </html>
   )
