@@ -2,7 +2,7 @@
 
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
-import { Activity, CalendarDays, Dumbbell, Gamepad2, Home, Search, Shield, Users, Video } from 'lucide-react'
+import { Activity, CalendarDays, Dumbbell, Gamepad2, Home, Plus, Search, Shield, Users, Video } from 'lucide-react'
 
 const nav = [
   { label: 'Dashboard', href: '/', icon: Home },
@@ -10,6 +10,7 @@ const nav = [
   { label: 'Jogadores', href: '/players', icon: Users },
   { label: 'Épocas', href: '/seasons', icon: CalendarDays },
   { label: 'Jogos', href: '/games', icon: Gamepad2 },
+  { label: 'Novo jogo', href: '/games/new', icon: Plus },
   { label: 'Vídeo', href: '#', icon: Video, disabled: true },
   { label: 'Performance', href: '#', icon: Activity, disabled: true },
   { label: 'Scouting', href: '#', icon: Search, disabled: true },
