@@ -7,6 +7,7 @@ export class HandballPerformanceDB extends Dexie {
     super('handball-performance-os');
     this.version(1).stores({ clubs: 'id, name', teams: 'id, clubId, name, category, gender, active', seasons: 'id, name, active', players: 'id, displayName, lastName, position, active', playerTeamSeasons: 'id, playerId, teamId, seasonId, [teamId+seasonId]', competitions: 'id, seasonId, name', matches: 'id, seasonId, teamId, competitionId, date, status', events: 'id, matchId, timestampSeconds, type, playerId, teamId', clips: 'id, matchId, eventId, startSeconds, endSeconds, favorite', playlists: 'id, name, createdAt, updatedAt' });
     this.version(2).stores({ matchSquads: 'id, matchId, playerId, [matchId+playerId], starter, captain' });
+    this.version(3).stores({ matches: 'id, seasonId, teamId, opponentTeamId, competitionId, date, status', matchSquads: 'id, matchId, playerId, teamId, [matchId+playerId], [matchId+teamId], starter, captain' });
   }
 }
 export const db = typeof window !== 'undefined' ? new HandballPerformanceDB() : null;
