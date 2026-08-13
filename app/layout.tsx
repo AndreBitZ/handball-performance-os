@@ -1,7 +1,6 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import './dashboard.css'
-import BackButton from './components/back-button'
 import AppShell from './components/app-shell'
 
 export const metadata: Metadata = {
@@ -13,10 +12,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="pt-PT">
       <body>
-        <AppShell>
-          <BackButton />
-          {children}
-        </AppShell>
+        <AppShell>{children}</AppShell>
       </body>
     </html>
   )
