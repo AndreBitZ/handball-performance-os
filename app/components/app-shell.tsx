@@ -2,7 +2,7 @@
 
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
-import { Activity, CalendarDays, Dumbbell, Gamepad2, Home, Plus, Search, Shield, Users, Video } from 'lucide-react'
+import { Activity, CalendarDays, Dumbbell, Gamepad2, Home, Plus, Search, Settings, Shield, Users, Video } from 'lucide-react'
 
 const nav = [
   { label: 'Dashboard', href: '/', icon: Home },
@@ -15,6 +15,7 @@ const nav = [
   { label: 'Performance', href: '#', icon: Activity, disabled: true },
   { label: 'Scouting', href: '#', icon: Search, disabled: true },
   { label: 'Treinos', href: '#', icon: Dumbbell, disabled: true },
+  { label: 'Armazenamento', href: '/storage', icon: Settings },
 ]
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
