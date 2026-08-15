@@ -69,3 +69,17 @@ export async function readProjectFile(
   const blob = await file.getFile();
   return blob.text();
 }
+
+export async function listProjectFiles(
+  folder: FileSystemDirectoryHandle,
+  relativeFolder: ProjectFolderName,
+): Promise<string[]> {
+  const directory = await folder.getDirectoryHandle(relativeFolder);
+  const files: string[] = [];
+
+  for await (const [name, entry] of directory.entries()) {
+    if (entry.kind === "file") files.push(name);
+  }
+
+  return files.sort();
+}
