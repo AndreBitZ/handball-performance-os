@@ -7,7 +7,14 @@ import {
   requestProjectFolderPermission,
   saveProjectFolderHandle,
 } from '@/lib/storage/project-session'
-import { compareDatabaseRestore, previewDatabaseRestore, saveDatabaseSnapshot, verifyDatabaseSnapshot, type DatabaseRestoreDiff } from '@/lib/storage/project-snapshot'
+import {
+  compareDatabaseRestore,
+  previewDatabaseRestore,
+  restoreDatabaseMerge,
+  saveDatabaseSnapshot,
+  verifyDatabaseSnapshot,
+  type DatabaseRestoreDiff,
+} from '@/lib/storage/project-snapshot'
 
 type RestorePreview = {
   filename: string
@@ -24,6 +31,7 @@ export default function StoragePage() {
   const [verifyingBackup, setVerifyingBackup] = useState(false)
   const [previewingRestore, setPreviewingRestore] = useState(false)
   const [comparingRestore, setComparingRestore] = useState(false)
+  const [restoringDatabase, setRestoringDatabase] = useState(false)
   const [lastBackup, setLastBackup] = useState<string | null>(null)
   const [restorePreview, setRestorePreview] = useState<RestorePreview | null>(null)
   const [restoreDiff, setRestoreDiff] = useState<DatabaseRestoreDiff | null>(null)
@@ -171,6 +179,23 @@ export default function StoragePage() {
     }
   }
 
+  async function restoreDatabase() {
+    if (!folder || !restoreDiff) return
+    if (!window.confirm('Restaurar o backup em modo seguro? Os dados atuais exclusivos serão preservados e será criado um backup de segurança antes da operação.')) return
+
+    setRestoringDatabase(true)
+    try {
+      setStatus('A criar backup de segurança e a restaurar…')
+      const result = await restoreDatabaseMerge(folder)
+      setStatus(`Restauro concluído: ${result.restoredRows} registos do backup aplicados. ${result.preservedRows} registos atuais preservados. Backup de segurança: database/${result.safetyBackup}`)
+      setRestoreDiff(await compareDatabaseRestore(folder))
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'Não foi possível restaurar a base de dados.')
+    } finally {
+      setRestoringDatabase(false)
+    }
+  }
+
   return (
     <main className="pageShell">
       <header className="pageHeader">
@@ -209,6 +234,7 @@ export default function StoragePage() {
           <button className="secondaryButton" onClick={verifyDatabaseBackup} disabled={!folder || verifyingBackup || restoring}>{verifyingBackup ? 'A verificar…' : 'Verificar backup'}</button>
           <button className="secondaryButton" onClick={previewRestore} disabled={!folder || previewingRestore || restoring}>{previewingRestore ? 'A preparar…' : 'Pré-visualizar restauro'}</button>
           <button className="secondaryButton" onClick={compareRestore} disabled={!folder || comparingRestore || restoring}>{comparingRestore ? 'A comparar…' : 'Comparar com dados atuais'}</button>
+          <button className="primaryButton" onClick={restoreDatabase} disabled={!folder || !restoreDiff || restoringDatabase || restoring}>{restoringDatabase ? 'A restaurar…' : 'Restaurar em modo seguro'}</button>
         </div>
 
         {restorePreview && (
