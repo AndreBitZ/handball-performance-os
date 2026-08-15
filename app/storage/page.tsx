@@ -7,13 +7,14 @@ import {
   requestProjectFolderPermission,
   saveProjectFolderHandle,
 } from '@/lib/storage/project-session'
-import { saveDatabaseSnapshot } from '@/lib/storage/project-snapshot'
+import { saveDatabaseSnapshot, verifyDatabaseSnapshot } from '@/lib/storage/project-snapshot'
 
 export default function StoragePage() {
   const [folder, setFolder] = useState<FileSystemDirectoryHandle | null>(null)
   const [status, setStatus] = useState('Nenhuma pasta ligada')
   const [testing, setTesting] = useState(false)
   const [backingUp, setBackingUp] = useState(false)
+  const [verifyingBackup, setVerifyingBackup] = useState(false)
   const [lastBackup, setLastBackup] = useState<string | null>(null)
   const [restoring, setRestoring] = useState(true)
 
@@ -105,6 +106,22 @@ export default function StoragePage() {
     }
   }
 
+  async function verifyDatabaseBackup() {
+    if (!folder) return
+    setVerifyingBackup(true)
+    try {
+      setStatus('A verificar o backup local…')
+      const result = await verifyDatabaseSnapshot(folder)
+      const totalRows = Object.values(result.tableCounts).reduce((sum, count) => sum + count, 0)
+      setLastBackup(new Date(result.exportedAt).toLocaleString('pt-PT'))
+      setStatus(`Backup válido: ${result.filename} — ${totalRows} registos verificados`)
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'Não foi possível verificar o backup.')
+    } finally {
+      setVerifyingBackup(false)
+    }
+  }
+
   return (
     <main className="pageShell">
       <header className="pageHeader">
@@ -145,6 +162,9 @@ export default function StoragePage() {
           </button>
           <button className="secondaryButton" onClick={createDatabaseBackup} disabled={!folder || backingUp || restoring}>
             {backingUp ? 'A criar backup…' : 'Criar backup da base de dados'}
+          </button>
+          <button className="secondaryButton" onClick={verifyDatabaseBackup} disabled={!folder || verifyingBackup || restoring}>
+            {verifyingBackup ? 'A verificar…' : 'Verificar backup'}
           </button>
         </div>
       </section>
