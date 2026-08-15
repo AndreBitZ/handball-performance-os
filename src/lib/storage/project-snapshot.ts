@@ -21,18 +21,7 @@ type ProjectSnapshot = {
   data: Record<string, unknown>
 }
 
-export async function saveDatabaseSnapshot(folder: FileSystemDirectoryHandle): Promise<string> {
-  const dump = await exportProject()
-  await writeProjectFile(folder, 'database', SNAPSHOT_FILENAME, await dump.text())
-  return SNAPSHOT_FILENAME
-}
-
-export async function verifyDatabaseSnapshot(folder: FileSystemDirectoryHandle): Promise<{
-  filename: string
-  exportedAt: string
-  tableCounts: Record<string, number>
-}> {
-  const text = await readProjectFile(folder, 'database', SNAPSHOT_FILENAME)
+function parseSnapshot(text: string): ProjectSnapshot {
   let parsed: ProjectSnapshot
 
   try {
@@ -50,11 +39,46 @@ export async function verifyDatabaseSnapshot(folder: FileSystemDirectoryHandle):
     throw new Error(`Backup inválido: faltam tabelas ${missingTables.join(', ')}.`)
   }
 
+  return parsed
+}
+
+export async function saveDatabaseSnapshot(folder: FileSystemDirectoryHandle): Promise<string> {
+  const dump = await exportProject()
+  await writeProjectFile(folder, 'database', SNAPSHOT_FILENAME, await dump.text())
+  return SNAPSHOT_FILENAME
+}
+
+export async function verifyDatabaseSnapshot(folder: FileSystemDirectoryHandle): Promise<{
+  filename: string
+  exportedAt: string
+  tableCounts: Record<string, number>
+}> {
+  const parsed = parseSnapshot(await readProjectFile(folder, 'database', SNAPSHOT_FILENAME))
+
   return {
     filename: SNAPSHOT_FILENAME,
     exportedAt: parsed.exportedAt,
     tableCounts: Object.fromEntries(
       EXPECTED_TABLES.map((table) => [table, (parsed.data[table] as unknown[]).length]),
     ),
+  }
+}
+
+export async function previewDatabaseRestore(folder: FileSystemDirectoryHandle): Promise<{
+  filename: string
+  exportedAt: string
+  tableCounts: Record<string, number>
+  totalRows: number
+}> {
+  const parsed = parseSnapshot(await readProjectFile(folder, 'database', SNAPSHOT_FILENAME))
+  const tableCounts = Object.fromEntries(
+    EXPECTED_TABLES.map((table) => [table, (parsed.data[table] as unknown[]).length]),
+  )
+
+  return {
+    filename: SNAPSHOT_FILENAME,
+    exportedAt: parsed.exportedAt,
+    tableCounts,
+    totalRows: Object.values(tableCounts).reduce((sum, count) => sum + count, 0),
   }
 }
