@@ -7,7 +7,7 @@ import {
   requestProjectFolderPermission,
   saveProjectFolderHandle,
 } from '@/lib/storage/project-session'
-import { previewDatabaseRestore, saveDatabaseSnapshot, verifyDatabaseSnapshot } from '@/lib/storage/project-snapshot'
+import { compareDatabaseRestore, previewDatabaseRestore, saveDatabaseSnapshot, verifyDatabaseSnapshot, type DatabaseRestoreDiff } from '@/lib/storage/project-snapshot'
 
 type RestorePreview = {
   filename: string
@@ -23,8 +23,10 @@ export default function StoragePage() {
   const [backingUp, setBackingUp] = useState(false)
   const [verifyingBackup, setVerifyingBackup] = useState(false)
   const [previewingRestore, setPreviewingRestore] = useState(false)
+  const [comparingRestore, setComparingRestore] = useState(false)
   const [lastBackup, setLastBackup] = useState<string | null>(null)
   const [restorePreview, setRestorePreview] = useState<RestorePreview | null>(null)
+  const [restoreDiff, setRestoreDiff] = useState<DatabaseRestoreDiff | null>(null)
   const [restoring, setRestoring] = useState(true)
 
   useEffect(() => {
@@ -66,6 +68,7 @@ export default function StoragePage() {
       await saveProjectFolderHandle(project.handle)
       setFolder(project.handle)
       setRestorePreview(null)
+      setRestoreDiff(null)
       setStatus(`Pasta ligada e guardada: ${project.handle.name}`)
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'Não foi possível ligar a pasta.')
@@ -109,6 +112,7 @@ export default function StoragePage() {
       const timestamp = new Date().toLocaleString('pt-PT')
       setLastBackup(timestamp)
       setRestorePreview(null)
+      setRestoreDiff(null)
       setStatus(`Backup criado com sucesso: database/${filename}`)
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'Não foi possível criar o backup da base de dados.')
@@ -140,12 +144,30 @@ export default function StoragePage() {
       setStatus('A preparar pré-visualização do restauro…')
       const preview = await previewDatabaseRestore(folder)
       setRestorePreview(preview)
+      setRestoreDiff(null)
       setStatus(`Pré-visualização pronta: ${preview.totalRows} registos no backup`)
     } catch (error) {
       setRestorePreview(null)
+      setRestoreDiff(null)
       setStatus(error instanceof Error ? error.message : 'Não foi possível preparar o restauro.')
     } finally {
       setPreviewingRestore(false)
+    }
+  }
+
+  async function compareRestore() {
+    if (!folder) return
+    setComparingRestore(true)
+    try {
+      setStatus('A comparar o backup com a base de dados atual…')
+      const diff = await compareDatabaseRestore(folder)
+      setRestoreDiff(diff)
+      setStatus(`Comparação concluída: ${diff.added} novos, ${diff.removed} removidos, ${diff.changed} alterados`)
+    } catch (error) {
+      setRestoreDiff(null)
+      setStatus(error instanceof Error ? error.message : 'Não foi possível comparar o backup.')
+    } finally {
+      setComparingRestore(false)
     }
   }
 
@@ -181,30 +203,37 @@ export default function StoragePage() {
 
         <div className="buttonRow">
           <button className="primaryButton" onClick={chooseFolder} disabled={restoring}>Escolher pasta</button>
-          <button className="secondaryButton" onClick={reconnectFolder} disabled={!folder || restoring}>
-            Confirmar acesso
-          </button>
-          <button className="secondaryButton" onClick={testStorage} disabled={!folder || testing || restoring}>
-            {testing ? 'A testar…' : 'Testar leitura/escrita'}
-          </button>
-          <button className="secondaryButton" onClick={createDatabaseBackup} disabled={!folder || backingUp || restoring}>
-            {backingUp ? 'A criar backup…' : 'Criar backup da base de dados'}
-          </button>
-          <button className="secondaryButton" onClick={verifyDatabaseBackup} disabled={!folder || verifyingBackup || restoring}>
-            {verifyingBackup ? 'A verificar…' : 'Verificar backup'}
-          </button>
-          <button className="secondaryButton" onClick={previewRestore} disabled={!folder || previewingRestore || restoring}>
-            {previewingRestore ? 'A preparar…' : 'Pré-visualizar restauro'}
-          </button>
+          <button className="secondaryButton" onClick={reconnectFolder} disabled={!folder || restoring}>Confirmar acesso</button>
+          <button className="secondaryButton" onClick={testStorage} disabled={!folder || testing || restoring}>{testing ? 'A testar…' : 'Testar leitura/escrita'}</button>
+          <button className="secondaryButton" onClick={createDatabaseBackup} disabled={!folder || backingUp || restoring}>{backingUp ? 'A criar backup…' : 'Criar backup da base de dados'}</button>
+          <button className="secondaryButton" onClick={verifyDatabaseBackup} disabled={!folder || verifyingBackup || restoring}>{verifyingBackup ? 'A verificar…' : 'Verificar backup'}</button>
+          <button className="secondaryButton" onClick={previewRestore} disabled={!folder || previewingRestore || restoring}>{previewingRestore ? 'A preparar…' : 'Pré-visualizar restauro'}</button>
+          <button className="secondaryButton" onClick={compareRestore} disabled={!folder || comparingRestore || restoring}>{comparingRestore ? 'A comparar…' : 'Comparar com dados atuais'}</button>
         </div>
 
         {restorePreview && (
           <div className="dataCards">
             <article className="dataCard">
-              <strong>Restauro seguro — apenas pré-visualização</strong>
+              <strong>Pré-visualização do restauro</strong>
               <small>{restorePreview.filename} · exportado em {new Date(restorePreview.exportedAt).toLocaleString('pt-PT')}</small>
-              <small>{restorePreview.totalRows} registos prontos para análise.</small>
+              <small>{restorePreview.totalRows} registos no backup. A base atual não foi alterada.</small>
             </article>
+          </div>
+        )}
+
+        {restoreDiff && (
+          <div className="dataCards">
+            <article className="dataCard">
+              <strong>Comparação segura — nenhuma alteração efetuada</strong>
+              <small>Atual: {restoreDiff.totalCurrent} · Backup: {restoreDiff.totalBackup}</small>
+              <small>Novos no backup: {restoreDiff.added} · Ausentes no backup: {restoreDiff.removed} · Alterados: {restoreDiff.changed}</small>
+            </article>
+            {Object.entries(restoreDiff.tables).map(([table, diff]) => (
+              <article className="dataCard" key={table}>
+                <strong>{table}</strong>
+                <small>Atual {diff.current} · Backup {diff.backup} · +{diff.added} · -{diff.removed} · ~{diff.changed}</small>
+              </article>
+            ))}
           </div>
         )}
       </section>
