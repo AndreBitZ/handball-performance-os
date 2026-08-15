@@ -1,6 +1,6 @@
 import { db } from './db'
 
-const tables = ['clubs','teams','seasons','players','playerTeamSeasons','competitions','matches','events','clips','playlists'] as const
+const tables = ['clubs','teams','seasons','players','playerTeamSeasons','competitions','matches','matchSquads','events','clips','playlists'] as const
 
 type TableName = typeof tables[number]
 type ProjectDump = { version: 1; exportedAt: string; data: Record<TableName, unknown[]> }
