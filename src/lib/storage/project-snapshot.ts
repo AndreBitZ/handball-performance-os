@@ -48,6 +48,11 @@ export type DatabaseRestoreResult = {
   safetyBackup: string
 }
 
+export type DatabaseRollbackResult = {
+  restoredRows: number
+  safetyBackup: string
+}
+
 function parseSnapshot(text: string): ProjectSnapshot {
   let parsed: ProjectSnapshot
 
@@ -219,4 +224,32 @@ export async function restoreDatabaseMerge(folder: FileSystemDirectoryHandle): P
   })
 
   return { restoredRows, preservedRows, safetyBackup }
+}
+
+/**
+ * Restores a previously created pre-restore safety snapshot.
+ * This intentionally clears the current Dexie tables first because the safety
+ * snapshot represents the complete state immediately before a restore operation.
+ */
+export async function rollbackDatabaseRestore(folder: FileSystemDirectoryHandle, safetyBackup: string): Promise<DatabaseRollbackResult> {
+  if (!db) throw new Error('Local database is only available in the browser.')
+  if (!safetyBackup.startsWith('pre-restore-') || !safetyBackup.endsWith('.json')) {
+    throw new Error('Ficheiro de segurança inválido.')
+  }
+
+  const parsed = parseSnapshot(await readProjectFile(folder, 'database', safetyBackup))
+  let restoredRows = 0
+
+  await db.transaction('rw', EXPECTED_TABLES.map((table) => (db as any)[table]), async () => {
+    for (const table of EXPECTED_TABLES) {
+      await (db as any)[table].clear()
+      const rows = parsed.data[table] as unknown[]
+      if (rows.length > 0) {
+        await (db as any)[table].bulkPut(rows)
+        restoredRows += rows.length
+      }
+    }
+  })
+
+  return { restoredRows, safetyBackup }
 }
