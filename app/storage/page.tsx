@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { openProjectFolder, readProjectFile, writeProjectFile, PROJECT_FOLDERS } from '@/src/lib/storage/local-project'
+import { openProjectFolder, readProjectFile, writeProjectFile, PROJECT_FOLDERS } from '@/lib/storage/local-project'
 
 export default function StoragePage() {
   const [folder, setFolder] = useState<FileSystemDirectoryHandle | null>(null)
