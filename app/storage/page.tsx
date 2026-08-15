@@ -1,21 +1,72 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { openProjectFolder, readProjectFile, writeProjectFile, PROJECT_FOLDERS } from '@/lib/storage/local-project'
+import {
+  loadProjectFolderHandle,
+  requestProjectFolderPermission,
+  saveProjectFolderHandle,
+} from '@/lib/storage/project-session'
 
 export default function StoragePage() {
   const [folder, setFolder] = useState<FileSystemDirectoryHandle | null>(null)
   const [status, setStatus] = useState('Nenhuma pasta ligada')
   const [testing, setTesting] = useState(false)
+  const [restoring, setRestoring] = useState(true)
+
+  useEffect(() => {
+    let active = true
+
+    async function restoreFolder() {
+      try {
+        const savedHandle = await loadProjectFolderHandle()
+        if (!savedHandle || !active) return
+
+        const granted = await requestProjectFolderPermission(savedHandle)
+        if (!active) return
+
+        if (granted) {
+          setFolder(savedHandle)
+          setStatus(`Pasta recuperada: ${savedHandle.name}`)
+        } else {
+          setStatus('Pasta guardada, mas a permissão de acesso precisa de ser renovada.')
+        }
+      } catch (error) {
+        if (active) {
+          setStatus(error instanceof Error ? error.message : 'Não foi possível recuperar a pasta guardada.')
+        }
+      } finally {
+        if (active) setRestoring(false)
+      }
+    }
+
+    void restoreFolder()
+    return () => {
+      active = false
+    }
+  }, [])
 
   async function chooseFolder() {
     try {
       setStatus('A pedir acesso à pasta…')
       const project = await openProjectFolder()
+      await saveProjectFolderHandle(project.handle)
       setFolder(project.handle)
-      setStatus('Pasta ligada e estrutura criada')
+      setStatus(`Pasta ligada e guardada: ${project.handle.name}`)
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'Não foi possível ligar a pasta.')
+    }
+  }
+
+  async function reconnectFolder() {
+    if (!folder) return
+
+    try {
+      setStatus('A validar permissões…')
+      const granted = await requestProjectFolderPermission(folder)
+      setStatus(granted ? `Acesso confirmado: ${folder.name}` : 'Acesso à pasta não autorizado.')
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'Não foi possível validar a permissão.')
     }
   }
 
@@ -49,21 +100,24 @@ export default function StoragePage() {
         <div className="panelHeader">
           <div>
             <h2>Pasta do projeto</h2>
-            <p>{status}</p>
+            <p>{restoring ? 'A verificar pasta guardada…' : status}</p>
           </div>
           <span className="status">{folder ? 'LIGADA' : 'LOCAL'}</span>
         </div>
 
         <div className="dataCards">
           <article className="dataCard">
-            <strong>{folder ? 'Handball Performance OS' : 'Nenhuma pasta selecionada'}</strong>
+            <strong>{folder ? folder.name : 'Nenhuma pasta selecionada'}</strong>
             <small>Os ficheiros serão organizados dentro da pasta escolhida.</small>
           </article>
         </div>
 
         <div className="buttonRow">
-          <button className="primaryButton" onClick={chooseFolder}>Escolher pasta</button>
-          <button className="secondaryButton" onClick={testStorage} disabled={!folder || testing}>
+          <button className="primaryButton" onClick={chooseFolder} disabled={restoring}>Escolher pasta</button>
+          <button className="secondaryButton" onClick={reconnectFolder} disabled={!folder || restoring}>
+            Confirmar acesso
+          </button>
+          <button className="secondaryButton" onClick={testStorage} disabled={!folder || testing || restoring}>
             {testing ? 'A testar…' : 'Testar leitura/escrita'}
           </button>
         </div>
