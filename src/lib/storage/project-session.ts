@@ -2,6 +2,11 @@ const DB_NAME = "handball-performance-project";
 const STORE_NAME = "settings";
 const KEY = "project-folder";
 
+type DirectoryPermissionHandle = FileSystemDirectoryHandle & {
+  queryPermission: (descriptor?: { mode?: "read" | "readwrite" }) => Promise<PermissionState>;
+  requestPermission: (descriptor?: { mode?: "read" | "readwrite" }) => Promise<PermissionState>;
+};
+
 function openSessionDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, 1);
@@ -37,8 +42,9 @@ export async function loadProjectFolderHandle(): Promise<FileSystemDirectoryHand
 export async function requestProjectFolderPermission(
   handle: FileSystemDirectoryHandle,
 ): Promise<boolean> {
-  const permission = await handle.queryPermission({ mode: "readwrite" });
+  const permissionHandle = handle as DirectoryPermissionHandle;
+  const permission = await permissionHandle.queryPermission({ mode: "readwrite" });
   if (permission === "granted") return true;
-  const requested = await handle.requestPermission({ mode: "readwrite" });
+  const requested = await permissionHandle.requestPermission({ mode: "readwrite" });
   return requested === "granted";
 }
