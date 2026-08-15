@@ -42,6 +42,12 @@ export type DatabaseRestoreDiff = {
   tables: Record<string, TableDiff>
 }
 
+export type DatabaseRestoreResult = {
+  restoredRows: number
+  preservedRows: number
+  safetyBackup: string
+}
+
 function parseSnapshot(text: string): ProjectSnapshot {
   let parsed: ProjectSnapshot
 
@@ -169,4 +175,48 @@ export async function compareDatabaseRestore(folder: FileSystemDirectoryHandle):
   )
 
   return { filename: SNAPSHOT_FILENAME, exportedAt: parsed.exportedAt, ...totals, tables }
+}
+
+/**
+ * Restores the backup as a non-destructive merge.
+ * - backup-only rows are inserted;
+ * - rows with the same id are updated from the backup;
+ * - rows that exist only in the current database are preserved;
+ * - nothing is deleted.
+ *
+ * Before touching Dexie, a fresh safety snapshot of the current database is written
+ * to the local project folder so the operation can always be reversed manually.
+ */
+export async function restoreDatabaseMerge(folder: FileSystemDirectoryHandle): Promise<DatabaseRestoreResult> {
+  if (!db) throw new Error('Local database is only available in the browser.')
+
+  const parsed = parseSnapshot(await readProjectFile(folder, 'database', SNAPSHOT_FILENAME))
+  const currentBackup = await exportProject()
+  const safetyBackup = `pre-restore-${new Date().toISOString().replace(/[:.]/g, '-')}.json`
+  await writeProjectFile(folder, 'database', safetyBackup, await currentBackup.text())
+
+  let restoredRows = 0
+  let preservedRows = 0
+
+  for (const table of EXPECTED_TABLES) {
+    const currentRows = await (db as any)[table].toArray() as unknown[]
+    const backupRows = parsed.data[table] as unknown[]
+    const backupIds = new Set(backupRows.map(rowId).filter((id): id is string => id !== null))
+    preservedRows += currentRows.filter((row) => {
+      const id = rowId(row)
+      return id !== null && !backupIds.has(id)
+    }).length
+  }
+
+  await db.transaction('rw', EXPECTED_TABLES.map((table) => (db as any)[table]), async () => {
+    for (const table of EXPECTED_TABLES) {
+      const rows = parsed.data[table] as unknown[]
+      if (rows.length > 0) {
+        await (db as any)[table].bulkPut(rows)
+        restoredRows += rows.length
+      }
+    }
+  })
+
+  return { restoredRows, preservedRows, safetyBackup }
 }
