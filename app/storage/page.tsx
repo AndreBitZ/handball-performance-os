@@ -7,7 +7,14 @@ import {
   requestProjectFolderPermission,
   saveProjectFolderHandle,
 } from '@/lib/storage/project-session'
-import { saveDatabaseSnapshot, verifyDatabaseSnapshot } from '@/lib/storage/project-snapshot'
+import { previewDatabaseRestore, saveDatabaseSnapshot, verifyDatabaseSnapshot } from '@/lib/storage/project-snapshot'
+
+type RestorePreview = {
+  filename: string
+  exportedAt: string
+  totalRows: number
+  tableCounts: Record<string, number>
+}
 
 export default function StoragePage() {
   const [folder, setFolder] = useState<FileSystemDirectoryHandle | null>(null)
@@ -15,7 +22,9 @@ export default function StoragePage() {
   const [testing, setTesting] = useState(false)
   const [backingUp, setBackingUp] = useState(false)
   const [verifyingBackup, setVerifyingBackup] = useState(false)
+  const [previewingRestore, setPreviewingRestore] = useState(false)
   const [lastBackup, setLastBackup] = useState<string | null>(null)
+  const [restorePreview, setRestorePreview] = useState<RestorePreview | null>(null)
   const [restoring, setRestoring] = useState(true)
 
   useEffect(() => {
@@ -56,6 +65,7 @@ export default function StoragePage() {
       const project = await openProjectFolder()
       await saveProjectFolderHandle(project.handle)
       setFolder(project.handle)
+      setRestorePreview(null)
       setStatus(`Pasta ligada e guardada: ${project.handle.name}`)
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'Não foi possível ligar a pasta.')
@@ -98,6 +108,7 @@ export default function StoragePage() {
       const filename = await saveDatabaseSnapshot(folder)
       const timestamp = new Date().toLocaleString('pt-PT')
       setLastBackup(timestamp)
+      setRestorePreview(null)
       setStatus(`Backup criado com sucesso: database/${filename}`)
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'Não foi possível criar o backup da base de dados.')
@@ -119,6 +130,22 @@ export default function StoragePage() {
       setStatus(error instanceof Error ? error.message : 'Não foi possível verificar o backup.')
     } finally {
       setVerifyingBackup(false)
+    }
+  }
+
+  async function previewRestore() {
+    if (!folder) return
+    setPreviewingRestore(true)
+    try {
+      setStatus('A preparar pré-visualização do restauro…')
+      const preview = await previewDatabaseRestore(folder)
+      setRestorePreview(preview)
+      setStatus(`Pré-visualização pronta: ${preview.totalRows} registos no backup`)
+    } catch (error) {
+      setRestorePreview(null)
+      setStatus(error instanceof Error ? error.message : 'Não foi possível preparar o restauro.')
+    } finally {
+      setPreviewingRestore(false)
     }
   }
 
@@ -166,7 +193,20 @@ export default function StoragePage() {
           <button className="secondaryButton" onClick={verifyDatabaseBackup} disabled={!folder || verifyingBackup || restoring}>
             {verifyingBackup ? 'A verificar…' : 'Verificar backup'}
           </button>
+          <button className="secondaryButton" onClick={previewRestore} disabled={!folder || previewingRestore || restoring}>
+            {previewingRestore ? 'A preparar…' : 'Pré-visualizar restauro'}
+          </button>
         </div>
+
+        {restorePreview && (
+          <div className="dataCards">
+            <article className="dataCard">
+              <strong>Restauro seguro — apenas pré-visualização</strong>
+              <small>{restorePreview.filename} · exportado em {new Date(restorePreview.exportedAt).toLocaleString('pt-PT')}</small>
+              <small>{restorePreview.totalRows} registos prontos para análise.</small>
+            </article>
+          </div>
+        )}
       </section>
 
       <section className="panel">
