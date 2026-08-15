@@ -7,11 +7,14 @@ import {
   requestProjectFolderPermission,
   saveProjectFolderHandle,
 } from '@/lib/storage/project-session'
+import { saveDatabaseSnapshot } from '@/lib/storage/project-snapshot'
 
 export default function StoragePage() {
   const [folder, setFolder] = useState<FileSystemDirectoryHandle | null>(null)
   const [status, setStatus] = useState('Nenhuma pasta ligada')
   const [testing, setTesting] = useState(false)
+  const [backingUp, setBackingUp] = useState(false)
+  const [lastBackup, setLastBackup] = useState<string | null>(null)
   const [restoring, setRestoring] = useState(true)
 
   useEffect(() => {
@@ -86,6 +89,22 @@ export default function StoragePage() {
     }
   }
 
+  async function createDatabaseBackup() {
+    if (!folder) return
+    setBackingUp(true)
+    try {
+      setStatus('A criar backup da base de dados…')
+      const filename = await saveDatabaseSnapshot(folder)
+      const timestamp = new Date().toLocaleString('pt-PT')
+      setLastBackup(timestamp)
+      setStatus(`Backup criado com sucesso: database/${filename}`)
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'Não foi possível criar o backup da base de dados.')
+    } finally {
+      setBackingUp(false)
+    }
+  }
+
   return (
     <main className="pageShell">
       <header className="pageHeader">
@@ -110,6 +129,10 @@ export default function StoragePage() {
             <strong>{folder ? folder.name : 'Nenhuma pasta selecionada'}</strong>
             <small>Os ficheiros serão organizados dentro da pasta escolhida.</small>
           </article>
+          <article className="dataCard">
+            <strong>{lastBackup ?? 'Ainda não criado'}</strong>
+            <small>Último backup local da base de dados.</small>
+          </article>
         </div>
 
         <div className="buttonRow">
@@ -119,6 +142,9 @@ export default function StoragePage() {
           </button>
           <button className="secondaryButton" onClick={testStorage} disabled={!folder || testing || restoring}>
             {testing ? 'A testar…' : 'Testar leitura/escrita'}
+          </button>
+          <button className="secondaryButton" onClick={createDatabaseBackup} disabled={!folder || backingUp || restoring}>
+            {backingUp ? 'A criar backup…' : 'Criar backup da base de dados'}
           </button>
         </div>
       </section>
