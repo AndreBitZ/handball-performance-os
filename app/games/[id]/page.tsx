@@ -48,7 +48,7 @@ export default function GameDetailPage({ params }: { params: { id: string } }) {
     </section>
     <section className="moduleGrid">
       <Link href={`/games/${match.id}/squad`} className="moduleCard"><div className="moduleEmoji"><Users/></div><h4>Convocados</h4><p>Selecionar os jogadores disponíveis para este jogo.</p><span>ABRIR →</span></Link>
-      <div className="moduleCard"><div className="moduleEmoji"><Play/></div><h4>Live Match</h4><p>Codificação em direto, cronómetro, substituições e eventos.</p><span>PRÓXIMO MÓDULO</span></div>
+      <Link href={`/games/${match.id}/live`} className="moduleCard"><div className="moduleEmoji"><Play/></div><h4>Live Match</h4><p>Iniciar cronómetro e registar eventos em direto.</p><span>ABRIR →</span></Link>
       <div className="moduleCard"><div className="moduleEmoji"><BarChart3/></div><h4>Estatísticas</h4><p>Análise do jogo, jogadores e indicadores de performance.</p><span>PRÓXIMO MÓDULO</span></div>
       <div className="moduleCard"><div className="moduleEmoji"><Video/></div><h4>Vídeo</h4><p>Vídeo, eventos e clips associados ao jogo.</p><span>PRÓXIMO MÓDULO</span></div>
     </section>
