@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "test:storage": "vitest run tests/storage/project-snapshot.test.ts",
+    "build": "npm run test:storage && next build",
     "start": "next start",
     "lint": "next lint"
   },
@@ -19,6 +20,8 @@
     "@types/node": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
-    "typescript": "latest"
+    "fake-indexeddb": "latest",
+    "typescript": "latest",
+    "vitest": "latest"
   }
 }
