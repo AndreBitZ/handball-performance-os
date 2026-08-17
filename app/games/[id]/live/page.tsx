@@ -36,7 +36,19 @@ export default function LiveMatchPage({ params }: { params: { id: string } }) {
 
   useEffect(() => { if (!running) return; const t=window.setInterval(()=>setSeconds(v=>{if(v>=HALF_SECONDS){setRunning(false);return HALF_SECONDS}return v+1}),1000); return ()=>window.clearInterval(t) }, [running])
 
-  useEffect(() => { if (!db || !match) return; let cancelled=false; const refresh=async()=>{const all=await db.playerIntervals.where('matchId').equals(match.id).toArray(); if(cancelled)return; const totals:Record<string,number>={}; for(const i of all){const end=i.endSeconds ?? (i.period===period?seconds:HALF_SECONDS); totals[i.playerId]=(totals[i.playerId]??0)+Math.max(0,end-i.startSeconds)} setMinutes(totals)}; void refresh(); return()=>{cancelled=true} },[seconds,period,match])
+  useEffect(() => {
+    if (!db || !match) return
+    const database = db
+    let cancelled = false
+    const refresh = async () => {
+      const all = await database.playerIntervals.where('matchId').equals(match.id).toArray()
+      if (cancelled) return
+      const totals: Record<string, number> = {}
+      for (const i of all) { const end=i.endSeconds ?? (i.period===period ? seconds : HALF_SECONDS); totals[i.playerId]=(totals[i.playerId]??0)+Math.max(0,end-i.startSeconds) }
+      setMinutes(totals)
+    }
+    void refresh(); return () => { cancelled = true }
+  }, [seconds, period, match])
 
   const displayTime=useMemo(()=>`${Math.floor(seconds/60).toString().padStart(2,'0')}:${(seconds%60).toString().padStart(2,'0')}`,[seconds])
   const courtPlayers=useMemo(()=>players.filter(p=>onCourt.includes(p.id)),[players,onCourt]), benchPlayers=useMemo(()=>players.filter(p=>!onCourt.includes(p.id)),[players,onCourt])
