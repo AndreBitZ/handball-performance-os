@@ -3,12 +3,24 @@
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import { ArrowLeft, Save, Trash2, UserRound } from 'lucide-react'
+import { ArrowLeft, Save, Trash2, UserRound, BarChart3 } from 'lucide-react'
 import { db } from '../../../src/lib/storage/db'
 import type { Player, PlayerTeamSeason, Position, Season, Team } from '../../../src/lib/storage/types'
 import '../../dashboard.css'
 
 const positions: Position[] = ['GR', 'PE', 'LE', 'CE', 'LD', 'PD', 'PIV']
+
+type PlayerStats = {
+  matches: number
+  starts: number
+  events: number
+  shots: number
+  goals: number
+  assists: number
+  turnovers: number
+  yellowCards: number
+  redCards: number
+}
 
 export default function PlayerDetailPage() {
   const params = useParams<{ id: string }>()
@@ -18,6 +30,7 @@ export default function PlayerDetailPage() {
   const [relations, setRelations] = useState<PlayerTeamSeason[]>([])
   const [teams, setTeams] = useState<Team[]>([])
   const [seasons, setSeasons] = useState<Season[]>([])
+  const [stats, setStats] = useState<PlayerStats>({ matches: 0, starts: 0, events: 0, shots: 0, goals: 0, assists: 0, turnovers: 0, yellowCards: 0, redCards: 0 })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -27,16 +40,32 @@ export default function PlayerDetailPage() {
     if (!database) return
     setLoading(true)
     setError('')
-    const [nextPlayer, nextRelations, nextTeams, nextSeasons] = await Promise.all([
+    const [nextPlayer, nextRelations, nextTeams, nextSeasons, squads, events] = await Promise.all([
       database.players.get(id),
       database.playerTeamSeasons.where('playerId').equals(id).toArray(),
       database.teams.orderBy('name').toArray(),
       database.seasons.orderBy('name').reverse().toArray(),
+      database.matchSquads.where('playerId').equals(id).toArray(),
+      database.events.where('playerId').equals(id).toArray(),
     ])
     setPlayer(nextPlayer ?? null)
     setRelations(nextRelations)
     setTeams(nextTeams)
     setSeasons(nextSeasons)
+
+    const matchIds = [...new Set(squads.map(squad => squad.matchId))]
+    const normalized = events.map(event => event.type.toUpperCase())
+    setStats({
+      matches: matchIds.length,
+      starts: squads.filter(squad => squad.starter).length,
+      events: events.length,
+      shots: normalized.filter(type => ['SHOT', 'GOAL', 'MISS', 'SAVE'].includes(type)).length,
+      goals: normalized.filter(type => ['GOAL', 'SHOT_GOAL'].includes(type)).length,
+      assists: normalized.filter(type => ['ASSIST', 'ASSISTÊNCIA', 'ASSISTENCIA'].includes(type)).length,
+      turnovers: normalized.filter(type => ['TURNOVER', 'PERDA', 'PERDA_BOLA'].includes(type)).length,
+      yellowCards: normalized.filter(type => ['YELLOW_CARD', 'YELLOW', 'AMARELO'].includes(type)).length,
+      redCards: normalized.filter(type => ['RED_CARD', 'RED', 'VERMELHO'].includes(type)).length,
+    })
     setLoading(false)
   }
 
@@ -89,13 +118,18 @@ export default function PlayerDetailPage() {
   if (loading) return <main className="content standalonePage"><p>A carregar atleta…</p></main>
   if (!player) return <main className="content standalonePage"><p>Atleta não encontrada.</p><Link href="/players">Voltar aos jogadores</Link></main>
 
+  const statItems = [
+    ['Jogos', stats.matches], ['Titularidades', stats.starts], ['Eventos', stats.events], ['Remates', stats.shots],
+    ['Golos', stats.goals], ['Assistências', stats.assists], ['Perdas', stats.turnovers], ['Amarelos', stats.yellowCards], ['Vermelhos', stats.redCards],
+  ]
+
   return <main className="content standalonePage">
     <header className="topbar">
       <div>
         <Link href="/players" className="backLink"><ArrowLeft size={16} /> Jogadores</Link>
         <p className="eyebrow">FICHA DE ATLETA</p>
         <h1>{player.displayName}</h1>
-        <p>Dados pessoais, perfil desportivo e histórico de ligação ao plantel.</p>
+        <p>Dados pessoais, perfil desportivo, histórico e estatísticas acumuladas.</p>
       </div>
       <div className="topbarActions">
         <button onClick={() => void save()} disabled={saving}><Save size={17} /> {saving ? 'A guardar…' : 'Guardar'}</button>
@@ -115,6 +149,13 @@ export default function PlayerDetailPage() {
         <label>Posição<select value={player.position ?? ''} onChange={e => update('position', e.target.value ? e.target.value as Position : undefined)}><option value="">Sem posição</option>{positions.map(position => <option key={position}>{position}</option>)}</select></label>
         <label>Mão dominante<select value={player.hand ?? ''} onChange={e => update('hand', e.target.value ? e.target.value as Player['hand'] : undefined)}><option value="">Não definida</option><option value="RIGHT">Direita</option><option value="LEFT">Esquerda</option><option value="BOTH">Ambas</option></select></label>
         <label className="checkboxLabel"><input type="checkbox" checked={player.active} onChange={e => update('active', e.target.checked)} /> Atleta ativa</label>
+      </div>
+    </section>
+
+    <section className="section">
+      <div className="sectionHeader"><div><h2>Estatísticas base</h2><p>Dados acumulados dos jogos e eventos registados.</p></div><BarChart3 size={24} /></div>
+      <div className="statsGrid">
+        {statItems.map(([label, value]) => <div className="statCard" key={label}><span>{label}</span><strong>{value}</strong></div>)}
       </div>
     </section>
 
