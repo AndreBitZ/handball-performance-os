@@ -14,10 +14,14 @@ vi.mock('../../src/lib/storage/local-project', () => ({
   }),
 }))
 
-;(globalThis as typeof globalThis & { window?: object }).window = {}
+Object.defineProperty(globalThis, 'window', {
+  value: globalThis,
+  configurable: true,
+})
 
 const { db } = await import('../../src/lib/storage/db')
-if (!db) throw new Error('A base local não foi inicializada para os testes.')
+const database = db
+if (!database) throw new Error('A base local não foi inicializada para os testes.')
 
 const {
   saveDatabaseSnapshot,
@@ -53,7 +57,7 @@ const player = (id: string, displayName: string) => ({
 })
 
 async function clearDatabase() {
-  for (const table of db.tables) await table.clear()
+  for (const table of database.tables) await table.clear()
 }
 
 describe('local project storage: backup, restore and rollback', () => {
@@ -63,9 +67,9 @@ describe('local project storage: backup, restore and rollback', () => {
   })
 
   it('creates and validates a complete database snapshot', async () => {
-    await db.clubs.put(club('club-1', 'Clube Teste'))
-    await db.players.put(player('player-1', 'Jogador Teste'))
-    await db.matchSquads.put({ id: 'squad-1', matchId: 'match-1', playerId: 'player-1', teamId: 'team-1', starter: true, captain: false })
+    await database.clubs.put(club('club-1', 'Clube Teste'))
+    await database.players.put(player('player-1', 'Jogador Teste'))
+    await database.matchSquads.put({ id: 'squad-1', matchId: 'match-1', playerId: 'player-1', teamId: 'team-1', starter: true, captain: false })
 
     await expect(saveDatabaseSnapshot(folder)).resolves.toBe('project-v1.json')
 
@@ -78,26 +82,26 @@ describe('local project storage: backup, restore and rollback', () => {
   })
 
   it('previews the backup without changing the current database', async () => {
-    await db.clubs.put(club('club-1', 'Clube Teste'))
+    await database.clubs.put(club('club-1', 'Clube Teste'))
     await saveDatabaseSnapshot(folder)
 
-    await db.clubs.update('club-1', { name: 'Alterado localmente' })
+    await database.clubs.update('club-1', { name: 'Alterado localmente' })
 
     const preview = await previewDatabaseRestore(folder)
     expect(preview.totalRows).toBe(1)
-    expect(await db.clubs.get('club-1')).toMatchObject({ name: 'Alterado localmente' })
+    expect(await database.clubs.get('club-1')).toMatchObject({ name: 'Alterado localmente' })
   })
 
   it('detects added, removed and changed rows before restoring', async () => {
-    await db.clubs.bulkPut([
+    await database.clubs.bulkPut([
       club('club-1', 'Clube Original'),
       club('club-2', 'Só no backup'),
     ])
     await saveDatabaseSnapshot(folder)
 
-    await db.clubs.put(club('club-1', 'Clube Alterado'))
-    await db.clubs.put(club('club-3', 'Só no atual'))
-    await db.clubs.delete('club-2')
+    await database.clubs.put(club('club-1', 'Clube Alterado'))
+    await database.clubs.put(club('club-3', 'Só no atual'))
+    await database.clubs.delete('club-2')
 
     const diff = await compareDatabaseRestore(folder)
     expect(diff.tables.clubs).toEqual({ current: 2, backup: 2, added: 1, removed: 1, changed: 1 })
@@ -107,36 +111,36 @@ describe('local project storage: backup, restore and rollback', () => {
   })
 
   it('merges the backup without deleting current-only rows and creates a safety backup', async () => {
-    await db.clubs.put(club('club-1', 'Nome original'))
-    await db.players.put(player('player-1', 'Jogador Original'))
+    await database.clubs.put(club('club-1', 'Nome original'))
+    await database.players.put(player('player-1', 'Jogador Original'))
     await saveDatabaseSnapshot(folder)
 
-    await db.clubs.put(club('club-1', 'Nome alterado'))
-    await db.players.put(player('player-2', 'Só no atual'))
+    await database.clubs.put(club('club-1', 'Nome alterado'))
+    await database.players.put(player('player-2', 'Só no atual'))
 
     const result = await restoreDatabaseMerge(folder)
     expect(result.restoredRows).toBe(2)
     expect(result.preservedRows).toBe(1)
     expect(result.safetyBackup).toMatch(/^pre-restore-.*\.json$/)
     expect(files.has(`database/${result.safetyBackup}`)).toBe(true)
-    expect(await db.clubs.get('club-1')).toMatchObject({ name: 'Nome original' })
-    expect(await db.players.get('player-2')).toMatchObject({ displayName: 'Só no atual' })
+    expect(await database.clubs.get('club-1')).toMatchObject({ name: 'Nome original' })
+    expect(await database.players.get('player-2')).toMatchObject({ displayName: 'Só no atual' })
   })
 
   it('rolls back to the exact pre-restore state', async () => {
-    await db.clubs.put(club('club-1', 'Estado antes'))
-    await db.players.put(player('player-1', 'Jogador Antes'))
+    await database.clubs.put(club('club-1', 'Estado antes'))
+    await database.players.put(player('player-1', 'Jogador Antes'))
     await saveDatabaseSnapshot(folder)
 
-    await db.clubs.put(club('club-1', 'Estado modificado'))
-    await db.players.put(player('player-2', 'Extra antes do restore'))
+    await database.clubs.put(club('club-1', 'Estado modificado'))
+    await database.players.put(player('player-2', 'Extra antes do restore'))
 
     const restoreResult = await restoreDatabaseMerge(folder)
-    await db.clubs.put(club('club-1', 'Estado depois do restore'))
+    await database.clubs.put(club('club-1', 'Estado depois do restore'))
 
     const rollback = await rollbackDatabaseRestore(folder, restoreResult.safetyBackup)
     expect(rollback.restoredRows).toBe(3)
-    expect(await db.clubs.get('club-1')).toMatchObject({ name: 'Estado modificado' })
-    expect(await db.players.get('player-2')).toMatchObject({ displayName: 'Extra antes do restore' })
+    expect(await database.clubs.get('club-1')).toMatchObject({ name: 'Estado modificado' })
+    expect(await database.players.get('player-2')).toMatchObject({ displayName: 'Extra antes do restore' })
   })
 })
