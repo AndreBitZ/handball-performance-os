@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 export type LiveCodingAction = 'GOAL' | 'SHOT' | 'SHOT_MISS' | 'TURNOVER' | 'STEAL' | 'ASSIST' | 'SUSPENSION_2M' | 'SEVEN_METER' | 'FOUL' | 'YELLOW' | 'RED'
 
@@ -17,11 +17,22 @@ const actions: { key: LiveCodingAction; label: string }[] = [
 
 export default function LiveCoding({ players, period, timestampSeconds, onEvent }: { players: Player[]; period: 1 | 2; timestampSeconds: number; onEvent: (event: LiveCodingEvent) => void }) {
   const [selected, setSelected] = useState<string | null>(players[0]?.id ?? null)
+
+  useEffect(() => {
+    if (!players.length) {
+      setSelected(null)
+      return
+    }
+    setSelected(current => current && players.some(player => player.id === current) ? current : players[0].id)
+  }, [players])
+
   const selectedPlayer = useMemo(() => players.find(p => p.id === selected), [players, selected])
+
   function code(action: LiveCodingAction) {
     if (!selected) return
     onEvent({ id: crypto.randomUUID(), playerId: selected, action, timestampSeconds: Math.max(0, Math.round(timestampSeconds)), period })
   }
+
   return <section className="section">
     <div className="sectionHeader"><div><p className="eyebrow">CODING RÁPIDO</p><h2>{selectedPlayer ? `${selectedPlayer.displayName}${selectedPlayer.shirtNumber != null ? ` · #${selectedPlayer.shirtNumber}` : ''}` : 'Seleciona um jogador'}</h2><p>Seleciona o jogador e regista a ação com um toque.</p></div></div>
     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>{players.map(p => <button key={p.id} onClick={() => setSelected(p.id)} aria-pressed={selected === p.id}>#{p.shirtNumber ?? '—'} {p.displayName}</button>)}</div>
