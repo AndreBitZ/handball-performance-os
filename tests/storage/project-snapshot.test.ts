@@ -20,8 +20,8 @@ Object.defineProperty(globalThis, 'window', {
 })
 
 const { db } = await import('../../src/lib/storage/db')
-const database = db
-if (!database) throw new Error('A base local não foi inicializada para os testes.')
+if (db === null) throw new Error('A base local não foi inicializada para os testes.')
+const database: NonNullable<typeof db> = db
 
 const {
   saveDatabaseSnapshot,
