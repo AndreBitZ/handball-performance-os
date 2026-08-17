@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react'
 import { ArrowLeft, Save, Trash2, UserRound } from 'lucide-react'
 import { db } from '../../../src/lib/storage/db'
 import type { Player, PlayerTeamSeason, Position, Season, Team } from '../../../src/lib/storage/types'
-import '../../../dashboard.css'
+import '../../dashboard.css'
 
 const positions: Position[] = ['GR', 'PE', 'LE', 'CE', 'LD', 'PD', 'PIV']
 
