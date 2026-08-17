@@ -9,10 +9,10 @@ type MemoryEntry =
   | { kind: 'file'; content: string }
   | { kind: 'directory'; entries: Map<string, MemoryEntry> }
 
-/** Minimal File System Access API test double for deterministic CI round-trips. */
+/** Minimal File System Access API test double with explicit structural typing. */
 function directory(entries = new Map<string, MemoryEntry>()): FileSystemDirectoryHandle {
-  return {
-    kind: 'directory',
+  const handle = {
+    kind: 'directory' as const,
     name: 'memory',
     async getDirectoryHandle(name: string, options?: FileSystemGetDirectoryOptions) {
       const entry = entries.get(name)
@@ -34,14 +34,32 @@ function directory(entries = new Map<string, MemoryEntry>()): FileSystemDirector
       }
       throw new DOMException(`File ${name} not found`, 'NotFoundError')
     },
-    async *entries() {
-      for (const [name, entry] of entries) yield [name, { kind: entry.kind }]
+    entries() {
+      return (async function* (): AsyncGenerator<
+        [string, FileSystemDirectoryHandle | FileSystemFileHandle],
+        void,
+        unknown
+      > {
+        for (const [name, entry] of entries) {
+          yield [name, entry.kind === 'file' ? file(name, entry) : directory(entry.entries)]
+        }
+      })()
     },
-    async *keys() {
-      for (const name of entries.keys()) yield name
+    keys() {
+      return (async function* (): AsyncGenerator<string, void, unknown> {
+        for (const name of entries.keys()) yield name
+      })()
     },
-    async *values() {
-      for (const entry of entries.values()) yield ({ kind: entry.kind })
+    values() {
+      return (async function* (): AsyncGenerator<
+        FileSystemDirectoryHandle | FileSystemFileHandle,
+        void,
+        unknown
+      > {
+        for (const [name, entry] of entries) {
+          yield entry.kind === 'file' ? file(name, entry) : directory(entry.entries)
+        }
+      })()
     },
     async removeEntry(name: string) {
       entries.delete(name)
@@ -49,7 +67,10 @@ function directory(entries = new Map<string, MemoryEntry>()): FileSystemDirector
     async resolve() {
       return null
     },
+    isSameEntry: async () => false,
   } as unknown as FileSystemDirectoryHandle
+
+  return handle
 }
 
 function file(name: string, entry: { kind: 'file'; content: string }): FileSystemFileHandle {
