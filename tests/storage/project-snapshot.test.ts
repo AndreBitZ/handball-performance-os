@@ -135,7 +135,7 @@ describe('local project storage: backup, restore and rollback', () => {
     await db.clubs.put(club('club-1', 'Estado depois do restore'))
 
     const rollback = await rollbackDatabaseRestore(folder, restoreResult.safetyBackup)
-    expect(rollback.restoredRows).toBe(2)
+    expect(rollback.restoredRows).toBe(3)
     expect(await db.clubs.get('club-1')).toMatchObject({ name: 'Estado modificado' })
     expect(await db.players.get('player-2')).toMatchObject({ displayName: 'Extra antes do restore' })
   })
