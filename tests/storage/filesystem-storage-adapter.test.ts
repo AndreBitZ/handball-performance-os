@@ -9,11 +9,11 @@ describe('FileSystemStorageAdapter', () => {
     expect(adapter.getDirectoryHandle()).toBe(handle)
   })
 
-  it('does not silently fall back to Dexie before filesystem migration is implemented', async () => {
+  it('does not silently fall back to Dexie before filesystem migration is implemented', () => {
     const handle = { name: 'handball-data', kind: 'directory' } as FileSystemDirectoryHandle
     const adapter = new FileSystemStorageAdapter(handle)
 
-    await expect(adapter.saveDatabaseSnapshot(handle)).rejects.toThrow(
+    expect(() => adapter.saveDatabaseSnapshot(handle)).toThrow(
       'Filesystem storage operation "saveDatabaseSnapshot" is not implemented yet',
     )
   })
