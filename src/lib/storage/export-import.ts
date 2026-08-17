@@ -39,8 +39,11 @@ export async function exportProject(): Promise<Blob> {
 }
 
 /** Export the current Dexie database into the selected local project folder. */
-export async function exportProjectToLocal(folder: FileSystemDirectoryHandle): Promise<LocalExportReport> {
-  const blob = await exportProject()
+export async function exportProjectToLocal(
+  folder: FileSystemDirectoryHandle,
+  sourceBlob?: Blob,
+): Promise<LocalExportReport> {
+  const blob = sourceBlob ?? await exportProject()
   const text = await blob.text()
   const dump = validateProjectDump(JSON.parse(text))
   const rows = tables.reduce((total, table) => total + dump.data[table].length, 0)
@@ -52,9 +55,7 @@ export async function exportProjectToLocal(folder: FileSystemDirectoryHandle): P
     backupFile = `project-v1-${stamp}.json`
     await writeProjectFile(folder, 'backups', backupFile, previous)
   } catch (error) {
-    if (!(error instanceof DOMException && error.name === 'NotFoundError')) {
-      throw error
-    }
+    if (!(error instanceof DOMException && error.name === 'NotFoundError')) throw error
   }
 
   await writeProjectFile(folder, 'database', PROJECT_FILE, text)
