@@ -5,22 +5,11 @@ import { useParams, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { ArrowLeft, Save, Trash2, UserRound, BarChart3 } from 'lucide-react'
 import { db } from '../../../src/lib/storage/db'
+import { calculatePlayerStats, type PlayerStats } from '../../../src/lib/players/stats'
 import type { Player, PlayerTeamSeason, Position, Season, Team } from '../../../src/lib/storage/types'
 import '../../dashboard.css'
 
 const positions: Position[] = ['GR', 'PE', 'LE', 'CE', 'LD', 'PD', 'PIV']
-
-type PlayerStats = {
-  matches: number
-  starts: number
-  events: number
-  shots: number
-  goals: number
-  assists: number
-  turnovers: number
-  yellowCards: number
-  redCards: number
-}
 
 export default function PlayerDetailPage() {
   const params = useParams<{ id: string }>()
@@ -52,20 +41,7 @@ export default function PlayerDetailPage() {
     setRelations(nextRelations)
     setTeams(nextTeams)
     setSeasons(nextSeasons)
-
-    const matchIds = [...new Set(squads.map(squad => squad.matchId))]
-    const normalized = events.map(event => event.type.toUpperCase())
-    setStats({
-      matches: matchIds.length,
-      starts: squads.filter(squad => squad.starter).length,
-      events: events.length,
-      shots: normalized.filter(type => ['SHOT', 'GOAL', 'MISS', 'SAVE'].includes(type)).length,
-      goals: normalized.filter(type => ['GOAL', 'SHOT_GOAL'].includes(type)).length,
-      assists: normalized.filter(type => ['ASSIST', 'ASSISTÊNCIA', 'ASSISTENCIA'].includes(type)).length,
-      turnovers: normalized.filter(type => ['TURNOVER', 'PERDA', 'PERDA_BOLA'].includes(type)).length,
-      yellowCards: normalized.filter(type => ['YELLOW_CARD', 'YELLOW', 'AMARELO'].includes(type)).length,
-      redCards: normalized.filter(type => ['RED_CARD', 'RED', 'VERMELHO'].includes(type)).length,
-    })
+    setStats(calculatePlayerStats(squads, events))
     setLoading(false)
   }
 
