@@ -31,11 +31,12 @@ export default function LiveMatchPage({ params }: { params: { id: string } }) {
       const loadedPlayers = ids.length ? await db.players.where('id').anyOf(ids).toArray() : []
       const byId = new Map(loadedPlayers.map(player => [player.id, player]))
       if (!active) return
-      setMatch(current)
-      setPlayers(squad.map(item => {
+      const mappedPlayers: PlayerWithSquad[] = squad.flatMap(item => {
         const player = byId.get(item.playerId)
-        return player ? { ...player, shirtNumber: item.shirtNumber ?? player.shirtNumber, position: item.position ?? player.position, starter: item.starter } : null
-      }).filter((player): player is PlayerWithSquad => Boolean(player)).sort((a, b) => (a.shirtNumber ?? 999) - (b.shirtNumber ?? 999)))
+        return player ? [{ ...player, shirtNumber: item.shirtNumber ?? player.shirtNumber, position: item.position ?? player.position, starter: item.starter }] : []
+      }).sort((a, b) => (a.shirtNumber ?? 999) - (b.shirtNumber ?? 999))
+      setMatch(current)
+      setPlayers(mappedPlayers)
       setSavedCount(await db.events.where('matchId').equals(params.id).count())
     }
     void load()
