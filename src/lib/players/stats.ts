@@ -1,4 +1,12 @@
 import type { MatchEvent, MatchSquad } from '../storage/types'
+import {
+  isAssistEvent,
+  isGoalEvent,
+  isRedCardEvent,
+  isShotEvent,
+  isTurnoverEvent,
+  isYellowCardEvent,
+} from '../matches/events'
 
 export type PlayerStats = {
   matches: number
@@ -24,8 +32,6 @@ const EMPTY_STATS: PlayerStats = {
   redCards: 0,
 }
 
-const normalize = (value?: string) => value?.trim().toUpperCase() ?? ''
-
 export function calculatePlayerStats(squads: MatchSquad[], events: MatchEvent[]): PlayerStats {
   const stats = { ...EMPTY_STATS }
   const matchIds = new Set(squads.map(squad => squad.matchId))
@@ -35,16 +41,12 @@ export function calculatePlayerStats(squads: MatchSquad[], events: MatchEvent[])
   stats.events = events.length
 
   for (const event of events) {
-    const type = normalize(event.type)
-    const result = normalize(event.result)
-
-    // A save is a goalkeeper action, not a shot by the player.
-    if (['SHOT', 'GOAL', 'MISS', 'SHOT_MISS', 'SHOT_GOAL'].includes(type)) stats.shots += 1
-    if (['GOAL', 'SHOT_GOAL'].includes(type) || result === 'GOAL') stats.goals += 1
-    if (['ASSIST', 'ASSISTENCIA', 'ASSISTÊNCIA'].includes(type)) stats.assists += 1
-    if (['TURNOVER', 'PERDA', 'PERDA_BOLA'].includes(type)) stats.turnovers += 1
-    if (['YELLOW_CARD', 'YELLOW', 'AMARELO'].includes(type)) stats.yellowCards += 1
-    if (['RED_CARD', 'RED', 'VERMELHO'].includes(type)) stats.redCards += 1
+    if (isShotEvent(event)) stats.shots += 1
+    if (isGoalEvent(event)) stats.goals += 1
+    if (isAssistEvent(event)) stats.assists += 1
+    if (isTurnoverEvent(event)) stats.turnovers += 1
+    if (isYellowCardEvent(event)) stats.yellowCards += 1
+    if (isRedCardEvent(event)) stats.redCards += 1
   }
 
   return stats
