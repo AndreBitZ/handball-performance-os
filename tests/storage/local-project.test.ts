@@ -9,8 +9,9 @@ type MemoryEntry =
   | { kind: 'file'; content: string }
   | { kind: 'directory'; entries: Map<string, MemoryEntry> }
 
+/** Minimal File System Access API test double for deterministic CI round-trips. */
 function directory(entries = new Map<string, MemoryEntry>()): FileSystemDirectoryHandle {
-  const handle: FileSystemDirectoryHandle = {
+  return {
     kind: 'directory',
     name: 'memory',
     async getDirectoryHandle(name: string, options?: FileSystemGetDirectoryOptions) {
@@ -34,15 +35,13 @@ function directory(entries = new Map<string, MemoryEntry>()): FileSystemDirector
       throw new DOMException(`File ${name} not found`, 'NotFoundError')
     },
     async *entries() {
-      for (const [name, entry] of entries) {
-        yield [name, { kind: entry.kind } as FileSystemHandle]
-      }
+      for (const [name, entry] of entries) yield [name, { kind: entry.kind }]
     },
     async *keys() {
       for (const name of entries.keys()) yield name
     },
     async *values() {
-      for (const entry of entries.values()) yield ({ kind: entry.kind } as FileSystemHandle)
+      for (const entry of entries.values()) yield ({ kind: entry.kind })
     },
     async removeEntry(name: string) {
       entries.delete(name)
@@ -50,9 +49,7 @@ function directory(entries = new Map<string, MemoryEntry>()): FileSystemDirector
     async resolve() {
       return null
     },
-  }
-
-  return handle
+  } as unknown as FileSystemDirectoryHandle
 }
 
 function file(name: string, entry: { kind: 'file'; content: string }): FileSystemFileHandle {
@@ -63,7 +60,7 @@ function file(name: string, entry: { kind: 'file'; content: string }): FileSyste
       return new File([entry.content], name, { type: 'application/json' })
     },
     async createWritable() {
-      let next = ''
+      let next = entry.content
       return {
         async write(data: FileSystemWriteChunkType) {
           next = typeof data === 'string' ? data : await new Response(data as BodyInit).text()
@@ -71,12 +68,11 @@ function file(name: string, entry: { kind: 'file'; content: string }): FileSyste
         async close() {
           entry.content = next
         },
-        async abort() {
-          next = entry.content
-        },
+        async abort() {},
         locked: false,
       } as FileSystemWritableFileStream
     },
+    isSameEntry: async () => false,
   }
 }
 
@@ -86,7 +82,6 @@ describe('local project filesystem operations', () => {
     const content = JSON.stringify({ version: 1, players: [{ id: 'p1' }] })
 
     await writeProjectFile(root, 'players', 'players.json', content)
-
     await expect(readProjectFile(root, 'players', 'players.json')).resolves.toBe(content)
   })
 
@@ -106,7 +101,6 @@ describe('local project filesystem operations', () => {
     const root = directory()
 
     await writeProjectFile(root, 'database', 'project-v1.json', '{"version":1}')
-
     await expect(readProjectFile(root, 'database', 'project-v1.json')).resolves.toBe('{"version":1}')
   })
 })
