@@ -5,9 +5,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, Pause, Play, RotateCcw, ArrowRightLeft } from 'lucide-react'
 import LiveCoding, { type LiveCodingEvent } from '../../live-coding'
 import { db } from '../../../../src/lib/storage/db'
+import { calculatePlayerSeconds, HALF_SECONDS } from '../../../../src/lib/match/minutes'
 import type { Match, MatchSquad, Player } from '../../../../src/lib/storage/types'
 
-const HALF_SECONDS = 30 * 60
 const ON_COURT = 7
 type PlayerWithSquad = Player & Pick<MatchSquad, 'shirtNumber' | 'position' | 'starter'>
 const uid = () => crypto.randomUUID()
@@ -43,8 +43,7 @@ export default function LiveMatchPage({ params }: { params: { id: string } }) {
     const refresh = async () => {
       const all = await database.playerIntervals.where('matchId').equals(match.id).toArray()
       if (cancelled) return
-      const totals: Record<string, number> = {}
-      for (const i of all) { const end=i.endSeconds ?? (i.period===period ? seconds : HALF_SECONDS); totals[i.playerId]=(totals[i.playerId]??0)+Math.max(0,end-i.startSeconds) }
+      const totals = calculatePlayerSeconds(all, period, seconds)
       setMinutes(totals)
     }
     void refresh(); return () => { cancelled = true }
