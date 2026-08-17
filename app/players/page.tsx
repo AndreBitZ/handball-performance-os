@@ -22,11 +22,12 @@ export default function PlayersPage() {
   const [seasonId, setSeasonId] = useState('')
 
   async function load() {
-    if (!db) return
+    const database = db
+    if (!database) return
     const [nextPlayers, nextTeams, nextSeasons] = await Promise.all([
-      db.players.orderBy('lastName').toArray(),
-      db.teams.orderBy('name').toArray(),
-      db.seasons.orderBy('name').reverse().toArray(),
+      database.players.orderBy('lastName').toArray(),
+      database.teams.orderBy('name').toArray(),
+      database.seasons.orderBy('name').reverse().toArray(),
     ])
     setPlayers(nextPlayers)
     setTeams(nextTeams)
@@ -39,13 +40,14 @@ export default function PlayersPage() {
 
   async function addPlayer(e: React.FormEvent) {
     e.preventDefault()
-    if (!db || !firstName.trim() || !lastName.trim()) return
+    const database = db
+    if (!database || !firstName.trim() || !lastName.trim()) return
     const now = new Date().toISOString()
     const playerId = createId()
     const number = shirtNumber ? Number(shirtNumber) : undefined
 
-    await db.transaction('rw', [db.players, db.playerTeamSeasons], async () => {
-      await db.players.add({
+    await database.transaction('rw', [database.players, database.playerTeamSeasons], async () => {
+      await database.players.add({
         id: playerId,
         firstName: firstName.trim(),
         lastName: lastName.trim(),
@@ -58,7 +60,7 @@ export default function PlayersPage() {
       })
 
       if (teamId && seasonId) {
-        await db.playerTeamSeasons.add({
+        await database.playerTeamSeasons.add({
           id: createId(),
           playerId,
           teamId,
@@ -76,11 +78,12 @@ export default function PlayersPage() {
   }
 
   async function remove(id: string) {
-    if (!db || !window.confirm('Apagar esta atleta?')) return
-    await db.transaction('rw', [db.players, db.playerTeamSeasons], async () => {
-      await db.players.delete(id)
-      const relations = await db.playerTeamSeasons.where('playerId').equals(id).toArray()
-      if (relations.length) await db.playerTeamSeasons.bulkDelete(relations.map(relation => relation.id))
+    const database = db
+    if (!database || !window.confirm('Apagar esta atleta?')) return
+    await database.transaction('rw', [database.players, database.playerTeamSeasons], async () => {
+      await database.players.delete(id)
+      const relations = await database.playerTeamSeasons.where('playerId').equals(id).toArray()
+      if (relations.length) await database.playerTeamSeasons.bulkDelete(relations.map(relation => relation.id))
     })
     await load()
   }
