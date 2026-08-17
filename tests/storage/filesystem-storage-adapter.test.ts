@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { FileSystemStorageAdapter } from '@/lib/storage/filesystem-storage-adapter'
+import { FileSystemStorageAdapter } from '../../src/lib/storage/filesystem-storage-adapter'
 
 describe('FileSystemStorageAdapter', () => {
   it('keeps the explicitly granted directory handle', () => {
