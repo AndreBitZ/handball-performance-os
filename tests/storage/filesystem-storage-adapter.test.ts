@@ -1,20 +1,49 @@
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+const mocks = vi.hoisted(() => ({
+  saveDatabaseSnapshot: vi.fn(),
+  verifyDatabaseSnapshot: vi.fn(),
+  previewDatabaseRestore: vi.fn(),
+  compareDatabaseRestore: vi.fn(),
+  restoreDatabaseMerge: vi.fn(),
+  rollbackDatabaseRestore: vi.fn(),
+}))
+
+vi.mock('../../src/lib/storage/project-snapshot', () => mocks)
+
 import { FileSystemStorageAdapter } from '../../src/lib/storage/filesystem-storage-adapter'
 
 describe('FileSystemStorageAdapter', () => {
-  it('keeps the explicitly granted directory handle', () => {
-    const handle = { name: 'handball-data', kind: 'directory' } as FileSystemDirectoryHandle
-    const adapter = new FileSystemStorageAdapter(handle)
+  const handle = { name: 'handball-data', kind: 'directory' } as FileSystemDirectoryHandle
+  let adapter: FileSystemStorageAdapter
 
+  beforeEach(() => {
+    vi.clearAllMocks()
+    adapter = new FileSystemStorageAdapter(handle)
+  })
+
+  it('keeps the explicitly granted directory handle', () => {
     expect(adapter.getDirectoryHandle()).toBe(handle)
   })
 
-  it('does not silently fall back to Dexie before filesystem migration is implemented', () => {
-    const handle = { name: 'handball-data', kind: 'directory' } as FileSystemDirectoryHandle
-    const adapter = new FileSystemStorageAdapter(handle)
+  it('writes snapshots through the filesystem snapshot implementation', async () => {
+    mocks.saveDatabaseSnapshot.mockResolvedValue('project-v1.json')
 
-    expect(() => adapter.saveDatabaseSnapshot(handle)).toThrow(
-      'Filesystem storage operation "saveDatabaseSnapshot" is not implemented yet',
-    )
+    await expect(adapter.saveDatabaseSnapshot()).resolves.toBe('project-v1.json')
+    expect(mocks.saveDatabaseSnapshot).toHaveBeenCalledWith(handle)
+  })
+
+  it('reads and verifies snapshots through the same directory', async () => {
+    mocks.verifyDatabaseSnapshot.mockResolvedValue({
+      filename: 'project-v1.json',
+      exportedAt: '2026-01-01T00:00:00.000Z',
+      tableCounts: { clubs: 1 },
+    })
+
+    await expect(adapter.verifyDatabaseSnapshot()).resolves.toMatchObject({
+      filename: 'project-v1.json',
+      tableCounts: { clubs: 1 },
+    })
+    expect(mocks.verifyDatabaseSnapshot).toHaveBeenCalledWith(handle)
   })
 })
