@@ -1,61 +1,55 @@
-import type { StorageAdapter } from './storage-adapter'
-import type {
-  DatabaseRestoreDiff,
-  DatabaseRestoreResult,
-  DatabaseRollbackResult,
+import {
+  compareDatabaseRestore,
+  previewDatabaseRestore,
+  restoreDatabaseMerge,
+  rollbackDatabaseRestore,
+  saveDatabaseSnapshot,
+  verifyDatabaseSnapshot,
+  type DatabaseRestoreDiff,
+  type DatabaseRestoreResult,
+  type DatabaseRollbackResult,
 } from './project-snapshot'
+import type { StorageAdapter } from './storage-adapter'
 
 /**
- * Filesystem-backed storage seam.
+ * Filesystem-backed storage adapter.
  *
- * The browser File System Access API only exposes the selected directory to
- * the application after the user explicitly grants access. This adapter
- * therefore receives a directory handle and never assumes access to an
- * arbitrary path on disk.
- *
- * Database migration is intentionally not wired here yet. Keeping the
- * implementation explicit prevents silently falling back to IndexedDB while
- * presenting the UI as if files were already the source of truth.
+ * The selected FileSystemDirectoryHandle is the boundary for all filesystem
+ * persistence. The underlying snapshot implementation uses that handle to
+ * write/read real JSON files under the project's `database` directory.
+ * Dexie remains the source of truth for database contents during migration.
  */
 export class FileSystemStorageAdapter implements StorageAdapter {
   constructor(private readonly directory: FileSystemDirectoryHandle) {}
 
-  private unsupported(operation: string): never {
-    throw new Error(
-      `Filesystem storage operation "${operation}" is not implemented yet. ` +
-        'The directory handle is available, but Dexie remains the source of truth during migration.',
-    )
+  getDirectoryHandle(): FileSystemDirectoryHandle {
+    return this.directory
   }
 
-  saveDatabaseSnapshot(_folder: FileSystemDirectoryHandle): Promise<string> {
-    return Promise.reject(this.unsupported('saveDatabaseSnapshot'))
+  saveDatabaseSnapshot(folder = this.directory): Promise<string> {
+    return saveDatabaseSnapshot(folder)
   }
 
-  verifyDatabaseSnapshot(_folder: FileSystemDirectoryHandle): ReturnType<StorageAdapter['verifyDatabaseSnapshot']> {
-    return Promise.reject(this.unsupported('verifyDatabaseSnapshot')) as ReturnType<StorageAdapter['verifyDatabaseSnapshot']>
+  verifyDatabaseSnapshot(folder = this.directory): ReturnType<StorageAdapter['verifyDatabaseSnapshot']> {
+    return verifyDatabaseSnapshot(folder)
   }
 
-  previewDatabaseRestore(_folder: FileSystemDirectoryHandle): ReturnType<StorageAdapter['previewDatabaseRestore']> {
-    return Promise.reject(this.unsupported('previewDatabaseRestore')) as ReturnType<StorageAdapter['previewDatabaseRestore']>
+  previewDatabaseRestore(folder = this.directory): ReturnType<StorageAdapter['previewDatabaseRestore']> {
+    return previewDatabaseRestore(folder)
   }
 
-  compareDatabaseRestore(_folder: FileSystemDirectoryHandle): Promise<DatabaseRestoreDiff> {
-    return Promise.reject(this.unsupported('compareDatabaseRestore'))
+  compareDatabaseRestore(folder = this.directory): Promise<DatabaseRestoreDiff> {
+    return compareDatabaseRestore(folder)
   }
 
-  restoreDatabaseMerge(_folder: FileSystemDirectoryHandle): Promise<DatabaseRestoreResult> {
-    return Promise.reject(this.unsupported('restoreDatabaseMerge'))
+  restoreDatabaseMerge(folder = this.directory): Promise<DatabaseRestoreResult> {
+    return restoreDatabaseMerge(folder)
   }
 
   rollbackDatabaseRestore(
-    _folder: FileSystemDirectoryHandle,
-    _safetyBackup: string,
+    folder = this.directory,
+    safetyBackup: string,
   ): Promise<DatabaseRollbackResult> {
-    return Promise.reject(this.unsupported('rollbackDatabaseRestore'))
-  }
-
-  /** Exposes the explicitly granted directory without exposing filesystem paths. */
-  getDirectoryHandle(): FileSystemDirectoryHandle {
-    return this.directory
+    return rollbackDatabaseRestore(folder, safetyBackup)
   }
 }
