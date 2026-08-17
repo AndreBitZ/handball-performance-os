@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "test:storage": "vitest run tests/storage/project-snapshot.test.ts",
+    "test:storage": "vitest run tests/storage/*.test.ts",
     "build": "npm run test:storage && next build",
     "start": "next start",
     "lint": "next lint"
