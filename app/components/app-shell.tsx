@@ -3,6 +3,7 @@
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { Activity, CalendarDays, Dumbbell, Gamepad2, Home, Plus, Search, Settings, Shield, Users, Video } from 'lucide-react'
+import StorageIndicator from './storage-indicator'
 
 const nav = [
   { label: 'Dashboard', href: '/', icon: Home },
@@ -30,7 +31,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           return <Link className={active ? 'navItem active' : 'navItem'} href={href} key={label}><Icon size={16}/><span>{label}</span></Link>
         })}
       </nav>
-      <div className="sidebarFooter">V1.0 · Local-first</div>
+      <div className="sidebarFooter"><StorageIndicator /><span>V1.0 · Local-first</span></div>
     </aside>
     <div className="appMain">{children}</div>
   </div>
