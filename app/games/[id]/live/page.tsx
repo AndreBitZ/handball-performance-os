@@ -37,7 +37,15 @@ export default function LiveMatchPage({ params }: { params: { id: string } }) {
       }).sort((a, b) => (a.shirtNumber ?? 999) - (b.shirtNumber ?? 999))
       setMatch(current)
       setPlayers(mappedPlayers)
-      setSavedCount(await db.events.where('matchId').equals(params.id).count())
+      const existingEvents = await db.events.where('matchId').equals(params.id).toArray()
+      setSavedCount(existingEvents.length)
+      const lastEvent = existingEvents.reduce((latest, event) => event.timestampSeconds > latest.timestampSeconds ? event : latest, { timestampSeconds: 0 } as typeof existingEvents[number])
+      if (lastEvent.period === 2 || lastEvent.timestampSeconds >= HALF_SECONDS) {
+        setPeriod(2)
+        setSeconds(Math.min(HALF_SECONDS, Math.max(0, lastEvent.timestampSeconds - HALF_SECONDS)))
+      } else {
+        setSeconds(Math.min(HALF_SECONDS, Math.max(0, lastEvent.timestampSeconds)))
+      }
     }
     void load()
     return () => { active = false }
@@ -63,7 +71,15 @@ export default function LiveMatchPage({ params }: { params: { id: string } }) {
     if (!db) return
     setError(null)
     try {
-      await db.events.add({ id: event.id, matchId: params.id, timestampSeconds: event.timestampSeconds, type: event.action, playerId: event.playerId, createdAt: new Date().toISOString() })
+      await db.events.add({
+        id: event.id,
+        matchId: params.id,
+        timestampSeconds: event.timestampSeconds,
+        period: event.period,
+        type: event.action,
+        playerId: event.playerId,
+        createdAt: new Date().toISOString(),
+      })
       setSavedCount(value => value + 1)
     } catch {
       setError('Não foi possível guardar o evento.')
