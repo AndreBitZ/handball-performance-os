@@ -17,6 +17,8 @@ vi.mock('../../src/lib/storage/local-project', () => ({
 ;(globalThis as typeof globalThis & { window?: object }).window = {}
 
 const { db } = await import('../../src/lib/storage/db')
+if (!db) throw new Error('A base local não foi inicializada para os testes.')
+
 const {
   saveDatabaseSnapshot,
   verifyDatabaseSnapshot,
@@ -27,11 +29,31 @@ const {
 } = await import('../../src/lib/storage/project-snapshot')
 
 const folder = {} as FileSystemDirectoryHandle
+const now = '2026-01-01T00:00:00.000Z'
+
+const club = (id: string, name: string) => ({
+  id,
+  name,
+  shortName: name.slice(0, 2),
+  createdAt: now,
+  updatedAt: now,
+})
+
+const player = (id: string, displayName: string) => ({
+  id,
+  displayName,
+  firstName: displayName.split(' ')[0],
+  lastName: displayName.split(' ').slice(1).join(' ') || displayName,
+  position: 'PE' as const,
+  shirtNumber: 7,
+  photoPath: '',
+  active: true,
+  createdAt: now,
+  updatedAt: now,
+})
 
 async function clearDatabase() {
-  for (const table of db.tables) {
-    await table.clear()
-  }
+  for (const table of db.tables) await table.clear()
 }
 
 describe('local project storage: backup, restore and rollback', () => {
@@ -41,8 +63,8 @@ describe('local project storage: backup, restore and rollback', () => {
   })
 
   it('creates and validates a complete database snapshot', async () => {
-    await db.clubs.put({ id: 'club-1', name: 'Clube Teste', shortName: 'CT', logoUrl: '' })
-    await db.players.put({ id: 'player-1', displayName: 'Jogador Teste', firstName: 'Jogador', lastName: 'Teste', position: 'Ponta', birthDate: '', jerseyNumber: 7, photoUrl: '', active: true })
+    await db.clubs.put(club('club-1', 'Clube Teste'))
+    await db.players.put(player('player-1', 'Jogador Teste'))
     await db.matchSquads.put({ id: 'squad-1', matchId: 'match-1', playerId: 'player-1', teamId: 'team-1', starter: true, captain: false })
 
     await expect(saveDatabaseSnapshot(folder)).resolves.toBe('project-v1.json')
@@ -56,7 +78,7 @@ describe('local project storage: backup, restore and rollback', () => {
   })
 
   it('previews the backup without changing the current database', async () => {
-    await db.clubs.put({ id: 'club-1', name: 'Clube Teste', shortName: 'CT', logoUrl: '' })
+    await db.clubs.put(club('club-1', 'Clube Teste'))
     await saveDatabaseSnapshot(folder)
 
     await db.clubs.update('club-1', { name: 'Alterado localmente' })
@@ -68,13 +90,13 @@ describe('local project storage: backup, restore and rollback', () => {
 
   it('detects added, removed and changed rows before restoring', async () => {
     await db.clubs.bulkPut([
-      { id: 'club-1', name: 'Clube Original', shortName: 'CO', logoUrl: '' },
-      { id: 'club-2', name: 'Só no backup', shortName: 'SB', logoUrl: '' },
+      club('club-1', 'Clube Original'),
+      club('club-2', 'Só no backup'),
     ])
     await saveDatabaseSnapshot(folder)
 
-    await db.clubs.put({ id: 'club-1', name: 'Clube Alterado', shortName: 'CA', logoUrl: '' })
-    await db.clubs.put({ id: 'club-3', name: 'Só no atual', shortName: 'SA', logoUrl: '' })
+    await db.clubs.put(club('club-1', 'Clube Alterado'))
+    await db.clubs.put(club('club-3', 'Só no atual'))
     await db.clubs.delete('club-2')
 
     const diff = await compareDatabaseRestore(folder)
@@ -85,12 +107,12 @@ describe('local project storage: backup, restore and rollback', () => {
   })
 
   it('merges the backup without deleting current-only rows and creates a safety backup', async () => {
-    await db.clubs.put({ id: 'club-1', name: 'Nome original', shortName: 'NO', logoUrl: '' })
-    await db.players.put({ id: 'player-1', displayName: 'Jogador original', firstName: 'Jogador', lastName: 'Original', position: 'Ponta', birthDate: '', jerseyNumber: 7, photoUrl: '', active: true })
+    await db.clubs.put(club('club-1', 'Nome original'))
+    await db.players.put(player('player-1', 'Jogador Original'))
     await saveDatabaseSnapshot(folder)
 
-    await db.clubs.put({ id: 'club-1', name: 'Nome alterado', shortName: 'NA', logoUrl: '' })
-    await db.players.put({ id: 'player-2', displayName: 'Só no atual', firstName: 'Só', lastName: 'Atual', position: 'Central', birthDate: '', jerseyNumber: 8, photoUrl: '', active: true })
+    await db.clubs.put(club('club-1', 'Nome alterado'))
+    await db.players.put(player('player-2', 'Só no atual'))
 
     const result = await restoreDatabaseMerge(folder)
     expect(result.restoredRows).toBe(2)
@@ -102,15 +124,15 @@ describe('local project storage: backup, restore and rollback', () => {
   })
 
   it('rolls back to the exact pre-restore state', async () => {
-    await db.clubs.put({ id: 'club-1', name: 'Estado antes', shortName: 'EA', logoUrl: '' })
-    await db.players.put({ id: 'player-1', displayName: 'Jogador antes', firstName: 'Jogador', lastName: 'Antes', position: 'Ponta', birthDate: '', jerseyNumber: 7, photoUrl: '', active: true })
+    await db.clubs.put(club('club-1', 'Estado antes'))
+    await db.players.put(player('player-1', 'Jogador Antes'))
     await saveDatabaseSnapshot(folder)
 
-    await db.clubs.put({ id: 'club-1', name: 'Estado modificado', shortName: 'EM', logoUrl: '' })
-    await db.players.put({ id: 'player-2', displayName: 'Extra antes do restore', firstName: 'Extra', lastName: 'Antes', position: 'Central', birthDate: '', jerseyNumber: 8, photoUrl: '', active: true })
+    await db.clubs.put(club('club-1', 'Estado modificado'))
+    await db.players.put(player('player-2', 'Extra antes do restore'))
 
     const restoreResult = await restoreDatabaseMerge(folder)
-    await db.clubs.put({ id: 'club-1', name: 'Estado depois do restore', shortName: 'ED', logoUrl: '' })
+    await db.clubs.put(club('club-1', 'Estado depois do restore'))
 
     const rollback = await rollbackDatabaseRestore(folder, restoreResult.safetyBackup)
     expect(rollback.restoredRows).toBe(2)
