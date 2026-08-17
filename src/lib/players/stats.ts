@@ -39,7 +39,7 @@ export function calculatePlayerStats(squads: MatchSquad[], events: MatchEvent[])
     const result = normalize(event.result)
 
     // A save is a goalkeeper action, not a shot by the player.
-    if (['SHOT', 'GOAL', 'MISS', 'SHOT_MISS'].includes(type)) stats.shots += 1
+    if (['SHOT', 'GOAL', 'MISS', 'SHOT_MISS', 'SHOT_GOAL'].includes(type)) stats.shots += 1
     if (['GOAL', 'SHOT_GOAL'].includes(type) || result === 'GOAL') stats.goals += 1
     if (['ASSIST', 'ASSISTENCIA', 'ASSISTÊNCIA'].includes(type)) stats.assists += 1
     if (['TURNOVER', 'PERDA', 'PERDA_BOLA'].includes(type)) stats.turnovers += 1
