@@ -4,8 +4,8 @@ import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, Pause, Play, RotateCcw } from 'lucide-react'
 import LiveCoding, { type LiveCodingEvent } from '../../live-coding'
-import { db } from '../../../../../src/lib/storage/db'
-import type { Match, MatchSquad, Player } from '../../../../../src/lib/storage/types'
+import { db } from '../../../../src/lib/storage/db'
+import type { Match, MatchSquad, Player } from '../../../../src/lib/storage/types'
 
 const HALF_SECONDS = 30 * 60
 
