@@ -46,7 +46,7 @@ describe('calculatePlayerStats', () => {
     expect(stats.starts).toBe(2)
   })
 
-  it('counts shots and goals correctly and never counts saves as shots', () => {
+  it('counts every shot outcome, including shot-goals and shot-misses, and never counts saves', () => {
     const stats = calculatePlayerStats([], [
       event('1', 'SHOT'),
       event('2', 'GOAL'),
