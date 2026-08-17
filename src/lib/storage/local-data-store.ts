@@ -2,7 +2,6 @@ import { readProjectFile, writeProjectFile } from './local-project'
 
 export type LocalEntity = { id: string; [key: string]: unknown }
 export type LocalTableName = 'clubs' | 'teams' | 'seasons' | 'competitions' | 'players' | 'matches'
-
 export type LocalProjectData = Record<LocalTableName, LocalEntity[]>
 
 const DATA_FILE = 'project-v1.json'
@@ -16,7 +15,9 @@ const TABLES: readonly LocalTableName[] = [
 ]
 
 function emptyData(): LocalProjectData {
-  return Object.fromEntries(TABLES.map((table) => [table, []])) as LocalProjectData
+  const data: Partial<LocalProjectData> = {}
+  for (const table of TABLES) data[table] = []
+  return data as LocalProjectData
 }
 
 function parseData(text: string): LocalProjectData {
