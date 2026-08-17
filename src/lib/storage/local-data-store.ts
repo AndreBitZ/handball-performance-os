@@ -1,7 +1,18 @@
 import { readProjectFile, writeProjectFile } from './local-project'
 
 export type LocalEntity = { id: string; [key: string]: unknown }
-export type LocalTableName = 'clubs' | 'teams' | 'seasons' | 'competitions' | 'players' | 'matches'
+export type LocalTableName =
+  | 'clubs'
+  | 'teams'
+  | 'seasons'
+  | 'players'
+  | 'playerTeamSeasons'
+  | 'competitions'
+  | 'matches'
+  | 'matchSquads'
+  | 'events'
+  | 'clips'
+  | 'playlists'
 export type LocalProjectData = Record<LocalTableName, LocalEntity[]>
 
 const DATA_FILE = 'project-v1.json'
@@ -9,15 +20,20 @@ const TABLES: readonly LocalTableName[] = [
   'clubs',
   'teams',
   'seasons',
-  'competitions',
   'players',
+  'playerTeamSeasons',
+  'competitions',
   'matches',
+  'matchSquads',
+  'events',
+  'clips',
+  'playlists',
 ]
 
 function emptyData(): LocalProjectData {
-  const data: Partial<LocalProjectData> = {}
+  const data = {} as LocalProjectData
   for (const table of TABLES) data[table] = []
-  return data as LocalProjectData
+  return data
 }
 
 function parseData(text: string): LocalProjectData {
