@@ -29,7 +29,9 @@ export function validateMatchEvent(event: StructuredEventInput, playersOnCourt?:
   if (!Number.isFinite(event.timestampSeconds) || event.timestampSeconds < 0 || event.timestampSeconds > 3600) errors.push('Timestamp inválido')
   if (!event.playerId) errors.push('Evento sem jogador')
   if (playersOnCourt && event.playerId && !playersOnCourt.has(event.playerId)) errors.push('Jogador não está em campo')
-  if (['SHOT','SHOT_MISS','GOAL'].includes(event.type)) {
+
+  const hasShotMetadata = event.zone !== undefined || event.distance !== undefined || event.shotType !== undefined
+  if (hasShotMetadata || ['SHOT','SHOT_MISS'].includes(event.type)) {
     if (!event.zone) errors.push('Remate sem zona')
     if (!event.distance) errors.push('Remate sem distância')
     if (!event.shotType) errors.push('Remate sem tipo')
