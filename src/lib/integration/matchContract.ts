@@ -1,7 +1,7 @@
 import type { HandballPerformanceDB } from '../storage/db';
-import type { MatchEvent, MatchSquad, Player } from '../storage/types';
+import type { MatchEvent, MatchSquad } from '../storage/types';
 
-export const MATCH_CONTRACT_VERSION = '1.1';
+export const MATCH_CONTRACT_VERSION = '1.1.0';
 export const MATCH_CONTRACT_SOURCE = 'handball-performance-os';
 
 export type CanonicalShot = {
@@ -26,8 +26,8 @@ export type CanonicalEvent = {
 };
 
 export type CanonicalMatchPackage = {
-  schemaVersion: string;
-  source: string;
+  schemaVersion: typeof MATCH_CONTRACT_VERSION;
+  source: typeof MATCH_CONTRACT_SOURCE;
   match: {
     id: string;
     seasonId: string;
@@ -58,18 +58,43 @@ const outcome = (event: MatchEvent) => event.result ?? (event.type === 'GOAL' ? 
 export async function exportMatchPackage(database: HandballPerformanceDB, matchId: string): Promise<CanonicalMatchPackage> {
   const match = await database.matches.get(matchId);
   if (!match) throw new Error('MATCH_NOT_FOUND');
+
   const [players, roster, events] = await Promise.all([
     database.players.toArray(),
     database.matchSquads.where('matchId').equals(matchId).toArray(),
     database.events.where('matchId').equals(matchId).sortBy('timestampSeconds'),
   ]);
+
+  const homeAway = match.homeAway === 'AWAY';
+  const homeTeamId = homeAway ? match.opponentTeamId ?? '' : match.teamId;
+  const awayTeamId = homeAway ? match.teamId : match.opponentTeamId ?? '';
+  const homeTeamName = homeAway ? match.opponentName : match.teamId;
+  const awayTeamName = homeAway ? match.teamId : match.opponentName;
   const rosterForMatch = roster.filter(item => players.some(player => player.id === item.playerId));
   const teamPlayers = new Map(players.map(player => [player.id, player]));
+
   const canonicalPlayers = rosterForMatch.map(item => {
     const player = teamPlayers.get(item.playerId)!;
-    return { id: player.id, name: player.displayName, shirtNumber: item.shirtNumber ?? player.shirtNumber ?? null, position: item.position ?? player.position, teamId: item.teamId ?? match.teamId, active: player.active };
+    return {
+      id: player.id,
+      name: player.displayName,
+      shirtNumber: item.shirtNumber ?? player.shirtNumber ?? null,
+      position: item.position ?? player.position,
+      teamId: item.teamId ?? match.teamId,
+      active: player.active,
+    };
   });
-  const canonicalRoster = rosterForMatch.map(item => ({ id: item.id, playerId: item.playerId, teamId: item.teamId ?? match.teamId, shirtNumber: item.shirtNumber ?? null, position: item.position, starter: item.starter, available: true }));
+
+  const canonicalRoster = rosterForMatch.map((item: MatchSquad) => ({
+    id: item.id,
+    playerId: item.playerId,
+    teamId: item.teamId ?? match.teamId,
+    shirtNumber: item.shirtNumber ?? null,
+    position: item.position,
+    starter: item.starter,
+    available: true,
+  }));
+
   const canonicalEvents: CanonicalEvent[] = events.map(event => ({
     id: event.id,
     matchId: event.matchId,
@@ -78,12 +103,42 @@ export async function exportMatchPackage(database: HandballPerformanceDB, matchI
     teamId: event.teamId ?? match.teamId,
     playerId: event.playerId ?? null,
     type: event.type.toLowerCase(),
-    metadata: event.shotType || event.zone || event.distance || event.attackPhase || event.xg != null ? { shot: { shooterId: event.playerId ?? null, position: event.position ?? null, zone: event.zone ?? null, distance: event.distance ?? null, type: event.shotType ?? null, outcome: outcome(event), xg: event.xg ?? null }, source: MATCH_CONTRACT_SOURCE } : { source: MATCH_CONTRACT_SOURCE },
+    metadata: event.shotType || event.zone || event.distance || event.attackPhase || event.xg != null
+      ? {
+          shot: {
+            shooterId: event.playerId ?? null,
+            position: event.position ?? null,
+            zone: event.zone ?? null,
+            distance: event.distance ?? null,
+            type: event.shotType ?? null,
+            outcome: outcome(event),
+            xg: event.xg ?? null,
+          },
+          source: MATCH_CONTRACT_SOURCE,
+        }
+      : { source: MATCH_CONTRACT_SOURCE },
   }));
+
   return {
     schemaVersion: MATCH_CONTRACT_VERSION,
     source: MATCH_CONTRACT_SOURCE,
-    match: { id: match.id, seasonId: match.seasonId, competitionId: match.competitionId ?? null, date: match.date, venue: match.venue ?? null, homeTeamId: match.teamId, awayTeamId: match.opponentTeamId ?? null, homeTeamName: match.teamId, awayTeamName: match.opponentName, status: match.status === 'COMPLETED' ? 'finished' : match.status === 'IN_PROGRESS' ? 'live' : 'planned', durationMinutes: 30, currentPeriod: 1, gameTime: 0, homeScore: match.goalsFor ?? 0, awayScore: match.goalsAgainst ?? 0 },
+    match: {
+      id: match.id,
+      seasonId: match.seasonId,
+      competitionId: match.competitionId ?? null,
+      date: match.date,
+      venue: match.venue ?? null,
+      homeTeamId,
+      awayTeamId,
+      homeTeamName,
+      awayTeamName,
+      status: match.status === 'COMPLETED' ? 'finished' : match.status === 'IN_PROGRESS' ? 'live' : 'planned',
+      durationMinutes: 30,
+      currentPeriod: 1,
+      gameTime: 0,
+      homeScore: homeAway ? match.goalsAgainst ?? 0 : match.goalsFor ?? 0,
+      awayScore: homeAway ? match.goalsFor ?? 0 : match.goalsAgainst ?? 0,
+    },
     players: canonicalPlayers,
     roster: canonicalRoster,
     events: canonicalEvents,
@@ -95,5 +150,17 @@ export async function exportMatchPackage(database: HandballPerformanceDB, matchI
 
 export function validateMatchPackage(payload: unknown): payload is CanonicalMatchPackage {
   const value = payload as CanonicalMatchPackage;
-  return !!value && typeof value === 'object' && value.schemaVersion === MATCH_CONTRACT_VERSION && !!value.match?.id && Array.isArray(value.players) && Array.isArray(value.roster) && Array.isArray(value.events);
+  return !!value
+    && typeof value === 'object'
+    && value.schemaVersion === MATCH_CONTRACT_VERSION
+    && value.source === MATCH_CONTRACT_SOURCE
+    && !!value.match?.id
+    && !!value.match?.homeTeamId
+    && !!value.match?.awayTeamId
+    && Array.isArray(value.players)
+    && Array.isArray(value.roster)
+    && Array.isArray(value.events)
+    && Array.isArray(value.situations)
+    && typeof value.statistics === 'object'
+    && !!value.metadata?.adapterVersion;
 }
