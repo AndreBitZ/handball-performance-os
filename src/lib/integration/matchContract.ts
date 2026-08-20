@@ -62,7 +62,9 @@ export async function exportMatchPackage(database: HandballPerformanceDB, matchI
   const match = await database.matches.get(matchId);
   if (!match) throw new Error('MATCH_NOT_FOUND');
 
-  const [players, roster, events] = await Promise.all([
+  const [ownTeam, opponentTeam, players, roster, events] = await Promise.all([
+    database.teams.get(match.teamId),
+    match.opponentTeamId ? database.teams.get(match.opponentTeamId) : Promise.resolve(undefined),
     database.players.toArray(),
     database.matchSquads.where('matchId').equals(matchId).toArray(),
     database.events.where('matchId').equals(matchId).sortBy('timestampSeconds'),
@@ -71,8 +73,9 @@ export async function exportMatchPackage(database: HandballPerformanceDB, matchI
   const homeAway = match.homeAway === 'AWAY';
   const homeTeamId = homeAway ? match.opponentTeamId ?? '' : match.teamId;
   const awayTeamId = homeAway ? match.teamId : match.opponentTeamId ?? '';
-  const homeTeamName = homeAway ? match.opponentName : match.teamId;
-  const awayTeamName = homeAway ? match.teamId : match.opponentName;
+  const homeTeamName = homeAway ? opponentTeam?.name ?? match.opponentName : ownTeam?.name ?? match.teamId;
+  const awayTeamName = homeAway ? ownTeam?.name ?? match.teamId : opponentTeam?.name ?? match.opponentName;
+  const ownTeamName = ownTeam?.name ?? match.teamId;
   const rosterForMatch = roster.filter(item => players.some(player => player.id === item.playerId));
   const teamPlayers = new Map(players.map(player => [player.id, player]));
 
@@ -138,7 +141,7 @@ export async function exportMatchPackage(database: HandballPerformanceDB, matchI
       homeTeamName,
       awayTeamName,
       ownTeamId: match.teamId,
-      ownTeamName: match.teamId,
+      ownTeamName,
       homeAway: orientation,
       status: match.status === 'COMPLETED' ? 'finished' : match.status === 'IN_PROGRESS' ? 'live' : 'planned',
       durationMinutes: 30,
