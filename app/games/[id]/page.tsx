@@ -2,8 +2,9 @@
 
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
-import { ArrowLeft, Users, BarChart3, Video, Play } from 'lucide-react'
+import { ArrowLeft, Users, BarChart3, Video, Play, Download } from 'lucide-react'
 import { db } from '../../../src/lib/storage/db'
+import { exportLivePackage } from '../../../src/lib/integration/live-package'
 import type { Match, Team, Season, Competition } from '../../../src/lib/storage/types'
 import '../../dashboard.css'
 
@@ -13,6 +14,8 @@ export default function GameDetailPage({ params }: { params: { id: string } }) {
   const [season, setSeason] = useState<Season | null>(null)
   const [competition, setCompetition] = useState<Competition | null>(null)
   const [loading, setLoading] = useState(true)
+  const [exporting, setExporting] = useState(false)
+  const [message, setMessage] = useState<string | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -38,14 +41,22 @@ export default function GameDetailPage({ params }: { params: { id: string } }) {
   const date = new Date(match.date).toLocaleString('pt-PT')
   const location = match.homeAway === 'HOME' ? 'Casa' : match.homeAway === 'AWAY' ? 'Fora' : 'Neutro'
 
+  async function exportForStats() {
+    setExporting(true); setMessage(null)
+    try { await exportLivePackage(match.id); setMessage('Pacote LIVE criado. Importa este ficheiro no Andebol-Stats.') }
+    catch (error) { setMessage(error instanceof Error ? error.message : 'Não foi possível criar o pacote LIVE.') }
+    finally { setExporting(false) }
+  }
+
   return <main className="content standalonePage">
     <header className="topbar">
       <div><Link href="/games" className="navItem" style={{ display: 'inline-flex', padding: 0, marginBottom: 12 }}><ArrowLeft size={16}/> Jogos</Link><p className="eyebrow">FICHA DO JOGO</p><h1>{team?.name ?? 'Equipa'} vs {match.opponentName}</h1><p>{date} · {location} · {match.venue || 'Local por definir'}</p></div>
     </header>
     <section className="hero">
       <div><p className="eyebrow">{competition?.name ?? 'Sem competição'}</p><h2>{team?.name ?? 'Equipa'} <span style={{ opacity: .65 }}>vs</span> {match.opponentName}</h2><p>{season?.name ?? 'Época'} · {match.status === 'PLANNED' ? 'Jogo planeado' : match.status === 'IN_PROGRESS' ? 'Em curso' : 'Concluído'}</p></div>
-      <div className="heroBadge">{match.goalsFor ?? '-'} : {match.goalsAgainst ?? '-'}</div>
+      <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:10 }}><div className="heroBadge">{match.goalsFor ?? '-'} : {match.goalsAgainst ?? '-'}</div><button onClick={()=>void exportForStats()} disabled={exporting}><Download size={16}/>{exporting?'A preparar…':'Exportar para Andebol-Stats'}</button></div>
     </section>
+    {message && <section className="section"><p role="status">{message}</p></section>}
     <section className="moduleGrid">
       <Link href={`/games/${match.id}/squad`} className="moduleCard"><div className="moduleEmoji"><Users/></div><h4>Convocados</h4><p>Selecionar os jogadores disponíveis para este jogo.</p><span>ABRIR →</span></Link>
       <Link href={`/games/${match.id}/live`} className="moduleCard"><div className="moduleEmoji"><Play/></div><h4>Live Match</h4><p>Iniciar cronómetro e registar eventos em direto.</p><span>ABRIR →</span></Link>
