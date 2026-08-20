@@ -38,6 +38,9 @@ export type CanonicalMatchPackage = {
     awayTeamId?: string | null;
     homeTeamName: string;
     awayTeamName: string;
+    ownTeamId: string;
+    ownTeamName: string;
+    homeAway: 'HOME' | 'AWAY' | 'NEUTRAL';
     status: 'planned' | 'live' | 'finished';
     durationMinutes: number;
     currentPeriod: 1 | 2;
@@ -119,6 +122,8 @@ export async function exportMatchPackage(database: HandballPerformanceDB, matchI
       : { source: MATCH_CONTRACT_SOURCE },
   }));
 
+  const orientation = match.homeAway === 'NEUTRAL' ? 'NEUTRAL' : match.homeAway;
+
   return {
     schemaVersion: MATCH_CONTRACT_VERSION,
     source: MATCH_CONTRACT_SOURCE,
@@ -132,6 +137,9 @@ export async function exportMatchPackage(database: HandballPerformanceDB, matchI
       awayTeamId,
       homeTeamName,
       awayTeamName,
+      ownTeamId: match.teamId,
+      ownTeamName: match.teamId,
+      homeAway: orientation,
       status: match.status === 'COMPLETED' ? 'finished' : match.status === 'IN_PROGRESS' ? 'live' : 'planned',
       durationMinutes: 30,
       currentPeriod: 1,
@@ -157,6 +165,8 @@ export function validateMatchPackage(payload: unknown): payload is CanonicalMatc
     && !!value.match?.id
     && !!value.match?.homeTeamId
     && !!value.match?.awayTeamId
+    && !!value.match?.ownTeamId
+    && !!value.match?.homeAway
     && Array.isArray(value.players)
     && Array.isArray(value.roster)
     && Array.isArray(value.events)
