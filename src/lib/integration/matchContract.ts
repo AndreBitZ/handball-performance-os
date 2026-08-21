@@ -1,5 +1,6 @@
 import type { HandballPerformanceDB } from '../storage/db';
 import type { MatchEvent, MatchSquad } from '../storage/types';
+import { buildPreMatchStats, type PreMatchStats } from './preMatchStats';
 
 export const MATCH_CONTRACT_VERSION = '1.1.0';
 export const MATCH_CONTRACT_SOURCE = 'handball-performance-os';
@@ -53,6 +54,7 @@ export type CanonicalMatchPackage = {
   events: CanonicalEvent[];
   situations: unknown[];
   statistics: Record<string, unknown>;
+  preMatchStats: PreMatchStats;
   metadata: { adapterVersion: string; exportedAt: string };
 };
 
@@ -62,12 +64,13 @@ export async function exportMatchPackage(database: HandballPerformanceDB, matchI
   const match = await database.matches.get(matchId);
   if (!match) throw new Error('MATCH_NOT_FOUND');
 
-  const [ownTeam, opponentTeam, players, roster, events] = await Promise.all([
+  const [ownTeam, opponentTeam, players, roster, events, preMatchStats] = await Promise.all([
     database.teams.get(match.teamId),
     match.opponentTeamId ? database.teams.get(match.opponentTeamId) : Promise.resolve(undefined),
     database.players.toArray(),
     database.matchSquads.where('matchId').equals(matchId).toArray(),
     database.events.where('matchId').equals(matchId).sortBy('timestampSeconds'),
+    buildPreMatchStats(database, matchId),
   ]);
 
   const homeAway = match.homeAway === 'AWAY';
@@ -155,6 +158,7 @@ export async function exportMatchPackage(database: HandballPerformanceDB, matchI
     events: canonicalEvents,
     situations: [],
     statistics: {},
+    preMatchStats,
     metadata: { adapterVersion: MATCH_CONTRACT_VERSION, exportedAt: new Date().toISOString() },
   };
 }
@@ -175,5 +179,7 @@ export function validateMatchPackage(payload: unknown): payload is CanonicalMatc
     && Array.isArray(value.events)
     && Array.isArray(value.situations)
     && typeof value.statistics === 'object'
+    && typeof value.preMatchStats === 'object'
+    && !!value.preMatchStats?.version
     && !!value.metadata?.adapterVersion;
 }
