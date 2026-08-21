@@ -23,10 +23,7 @@ export default function GameDetailPage({ params }: { params: { id: string } }) {
       const item = await db.matches.get(params.id)
       setMatch(item ?? null)
       if (item) {
-        const [t, s, c] = await Promise.all([
-          db.teams.get(item.teamId), db.seasons.get(item.seasonId),
-          item.competitionId ? db.competitions.get(item.competitionId) : Promise.resolve(undefined),
-        ])
+        const [t, s, c] = await Promise.all([db.teams.get(item.teamId), db.seasons.get(item.seasonId), item.competitionId ? db.competitions.get(item.competitionId) : Promise.resolve(undefined)])
         setTeam(t ?? null); setSeason(s ?? null); setCompetition(c ?? null)
       }
       setLoading(false)
@@ -51,6 +48,12 @@ export default function GameDetailPage({ params }: { params: { id: string } }) {
     <header className="topbar"><div><Link href="/games" className="navItem" style={{ display:'inline-flex', padding:0, marginBottom:12 }}><ArrowLeft size={16}/> Jogos</Link><p className="eyebrow">FICHA DO JOGO</p><h1>{team?.name ?? 'Equipa'} vs {currentMatch.opponentName}</h1><p>{date} · {location} · {currentMatch.venue || 'Local por definir'}</p></div></header>
     <section className="hero"><div><p className="eyebrow">{competition?.name ?? 'Sem competição'}</p><h2>{team?.name ?? 'Equipa'} <span style={{ opacity:.65 }}>vs</span> {currentMatch.opponentName}</h2><p>{season?.name ?? 'Época'} · {currentMatch.status === 'PLANNED' ? 'Jogo planeado' : currentMatch.status === 'IN_PROGRESS' ? 'Em curso' : 'Concluído'}</p></div><div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:10}}><div className="heroBadge">{currentMatch.goalsFor ?? '-'} : {currentMatch.goalsAgainst ?? '-'}</div><button onClick={()=>void exportForStats()} disabled={exporting}><Download size={16}/>{exporting?'A preparar…':'Exportar Match JSON'}</button></div></section>
     {message && <section className="section"><p role="status">{message}</p></section>}
-    <section className="moduleGrid"><Link href={`/games/${currentMatch.id}/squad`} className="moduleCard"><div className="moduleEmoji"><Users/></div><h4>Convocados</h4><p>Selecionar os jogadores disponíveis para este jogo.</p><span>ABRIR →</span></Link><Link href={`/games/${currentMatch.id}/live`} className="moduleCard"><div className="moduleEmoji"><Play/></div><h4>Live Match</h4><p>Iniciar cronómetro e registar eventos em direto.</p><span>ABRIR →</span></Link><Link href="/games/import" className="moduleCard"><div className="moduleEmoji"><Upload/></div><h4>Importar resultado</h4><p>Receber o Match JSON final vindo do Andebol-Stats.</p><span>ABRIR →</span></Link><div className="moduleCard"><div className="moduleEmoji"><BarChart3/></div><h4>Estatísticas</h4><p>Análise do jogo, jogadores e indicadores de performance.</p><span>PRÓXIMO MÓDULO</span></div><div className="moduleCard"><div className="moduleEmoji"><Video/></div><h4>Vídeo</h4><p>Vídeo, eventos e clips associados ao jogo.</p><span>PRÓXIMO MÓDULO</span></div></section>
+    <section className="moduleGrid">
+      <Link href={`/games/${currentMatch.id}/squad`} className="moduleCard"><div className="moduleEmoji"><Users/></div><h4>Convocados</h4><p>Selecionar os jogadores disponíveis para este jogo.</p><span>ABRIR →</span></Link>
+      <Link href={`/games/${currentMatch.id}/live`} className="moduleCard"><div className="moduleEmoji"><Play/></div><h4>Live Match</h4><p>Iniciar cronómetro e registar eventos em direto.</p><span>ABRIR →</span></Link>
+      <Link href="/games/import" className="moduleCard"><div className="moduleEmoji"><Upload/></div><h4>Importar resultado</h4><p>Receber o Match JSON final vindo do Andebol-Stats.</p><span>ABRIR →</span></Link>
+      <div className="moduleCard"><div className="moduleEmoji"><BarChart3/></div><h4>Estatísticas</h4><p>Análise do jogo, jogadores e indicadores de performance.</p><span>PRÓXIMO MÓDULO</span></div>
+      <Link href={`/games/${currentMatch.id}/video`} className="moduleCard"><div className="moduleEmoji"><Video/></div><h4>Vídeo</h4><p>Adicionar vídeo, sincronizar as duas partes e saltar diretamente para os eventos.</p><span>ABRIR →</span></Link>
+    </section>
   </main>
 }
