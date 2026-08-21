@@ -10,6 +10,7 @@ export interface Match { id: UUID; seasonId: UUID; competitionId?: UUID; teamId:
 export interface MatchSquad { id: UUID; matchId: UUID; playerId: UUID; teamId?: UUID; starter: boolean; captain: boolean; shirtNumber?: number; position?: Position; }
 export interface MatchPlayerInterval { id: UUID; matchId: UUID; playerId: UUID; period: 1 | 2; startSeconds: number; endSeconds?: number; createdAt: string; updatedAt: string; }
 export interface MatchClockState { id: UUID; matchId: UUID; period: 1 | 2; elapsedSeconds: number; running: boolean; lastStartedAt?: string; updatedAt: string; }
+export interface MatchVideoSync { id: UUID; matchId: UUID; firstHalfStartVideoSeconds?: number; firstHalfEndVideoSeconds?: number; secondHalfStartVideoSeconds?: number; secondHalfEndVideoSeconds?: number; updatedAt: string; }
 export interface MatchBackupSnapshot { id: UUID; matchId: UUID; createdAt: string; schemaVersion: number; data: string; }
 export interface MatchEvent { id: UUID; matchId: UUID; timestampSeconds: number; period?: 1 | 2; durationSeconds?: number; type: string; teamId?: UUID; playerId?: UUID; position?: Position; zone?: string; distance?: string; shotType?: string; result?: string; attackPhase?: string; xg?: number; notes?: string; tags?: string[]; createdAt: string; }
 export interface Clip { id: UUID; matchId: UUID; eventId?: UUID; startSeconds: number; endSeconds: number; title?: string; notes?: string; generatedPath?: string; favorite: boolean; createdAt: string; }
