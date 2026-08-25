@@ -39,6 +39,31 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return <div className={collapsed ? 'appShell sidebarCollapsed' : 'appShell'}>
+    <style>{`
+      .appShell .sidebarToggle { position:absolute; top:18px; right:-12px; width:24px; height:24px; border:1px solid #30394d; border-radius:50%; background:#101522; color:#dfe5f0; display:grid; place-items:center; cursor:pointer; z-index:5; box-shadow:0 2px 8px rgba(0,0,0,.2); }
+      .appShell .sidebarToggle:hover { background:#20283a; color:#fff; }
+      .appShell .navItem { position:relative; white-space:nowrap; }
+      .appShell .navItem span { transition:opacity .15s ease, width .15s ease; overflow:hidden; }
+      .appShell .sidebar { transition:width .18s ease; box-sizing:border-box; }
+      .appShell .appMain { transition:margin-left .18s ease, width .18s ease; }
+      .appShell.sidebarCollapsed .sidebar { width:72px; padding-left:8px; padding-right:8px; }
+      .appShell.sidebarCollapsed .appMain { margin-left:72px; width:calc(100% - 72px); }
+      .appShell.sidebarCollapsed .brand { justify-content:center; padding-left:0; padding-right:0; }
+      .appShell.sidebarCollapsed .brandText, .appShell.sidebarCollapsed .navItem span, .appShell.sidebarCollapsed .sidebarVersion { width:0; opacity:0; pointer-events:none; }
+      .appShell.sidebarCollapsed .navItem { justify-content:center; padding-left:0; padding-right:0; gap:0; }
+      .appShell.sidebarCollapsed .navItem.active { box-shadow:none; }
+      .appShell.sidebarCollapsed .navItem.active::before { content:''; position:absolute; left:0; width:3px; height:22px; border-radius:0 3px 3px 0; background:var(--accent); }
+      .appShell.sidebarCollapsed .sidebarFooter { padding-left:0; padding-right:0; }
+      .appShell.sidebarCollapsed .storageIndicator { justify-content:center; padding-left:6px; padding-right:6px; }
+      @media(max-width:700px) {
+        .appShell .sidebar { width:64px; padding:14px 8px; }
+        .appShell .appMain { margin-left:64px; width:calc(100% - 64px); }
+        .appShell .sidebarToggle { display:none; }
+        .appShell .brandText, .appShell .navItem span, .appShell .sidebarVersion { display:none; }
+        .appShell .brand { justify-content:center; padding-left:0; padding-right:0; }
+        .appShell .navItem { justify-content:center; padding-left:0; padding-right:0; gap:0; }
+      }
+    `}</style>
     <aside className="sidebar">
       <div className="brand">
         <div className="brandMark">HP</div>
