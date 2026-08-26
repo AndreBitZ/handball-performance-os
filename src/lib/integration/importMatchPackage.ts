@@ -25,7 +25,7 @@ export async function importAndebolStatsResult(database: HandballPerformanceDB, 
   if (!existingMatch) throw new Error('MATCH_NOT_FOUND');
   const now = new Date().toISOString();
 
-  await database.transaction('rw', database.matches, database.matchSquads, database.events, async () => {
+  await database.transaction('rw', database.matches, database.matchSquads, database.events, database.players, async () => {
     const isAway = existingMatch.homeAway === 'AWAY';
     const ownScore = isAway ? payload.match.awayScore : payload.match.homeScore;
     const opponentScore = isAway ? payload.match.homeScore : payload.match.awayScore;
@@ -59,6 +59,17 @@ export async function importAndebolStatsResult(database: HandballPerformanceDB, 
           position,
         });
       }
+    }
+
+    for (const importedPlayer of payload.players) {
+      if (!importedPlayer.hpi) continue;
+      const current = await database.players.get(importedPlayer.id);
+      if (!current) continue;
+      const snapshot = { ...importedPlayer.hpi, matchId: payload.match.id, updatedAt: importedPlayer.hpi.updatedAt || now };
+      const history = (current.hpiHistory ?? []).filter(item => item.matchId !== payload.match.id);
+      history.push(snapshot);
+      history.sort((a, b) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime());
+      await database.players.update(current.id, { hpi: snapshot, hpiHistory: history.slice(-50), updatedAt: now });
     }
 
     const existingEvents = await database.events.where('matchId').equals(payload.match.id).toArray();
