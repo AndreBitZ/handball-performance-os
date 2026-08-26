@@ -1,3 +1,5 @@
+import type { LocalProjectHandle, ProjectFolderHandle } from './local-project'
+
 const DB_NAME = "handball-performance-project";
 const STORE_NAME = "settings";
 const KEY = "project-folder";
@@ -16,32 +18,30 @@ function openSessionDb(): Promise<IDBDatabase> {
   });
 }
 
-export async function saveProjectFolderHandle(handle: FileSystemDirectoryHandle): Promise<void> {
-  const db = await openSessionDb();
+export async function saveProjectFolderHandle(handle: ProjectFolderHandle): Promise<void> {
+  const database = await openSessionDb();
   await new Promise<void>((resolve, reject) => {
-    const transaction = db.transaction(STORE_NAME, "readwrite");
+    const transaction = database.transaction(STORE_NAME, "readwrite");
     transaction.objectStore(STORE_NAME).put(handle, KEY);
     transaction.oncomplete = () => resolve();
-    transaction.onerror = () => reject(transaction.error ?? new Error("Não foi possível guardar a pasta do projeto."));
+    transaction.onerror = () => reject(transaction.error ?? new Error("Não foi possível guardar a sessão local."));
   });
-  db.close();
+  database.close();
 }
 
-export async function loadProjectFolderHandle(): Promise<FileSystemDirectoryHandle | null> {
-  const db = await openSessionDb();
-  const handle = await new Promise<FileSystemDirectoryHandle | null>((resolve, reject) => {
-    const transaction = db.transaction(STORE_NAME, "readonly");
-    const request = transaction.objectStore(STORE_NAME).get(KEY);
-    request.onsuccess = () => resolve((request.result as FileSystemDirectoryHandle | undefined) ?? null);
-    request.onerror = () => reject(request.error ?? new Error("Não foi possível recuperar a pasta do projeto."));
+export async function loadProjectFolderHandle(): Promise<ProjectFolderHandle | null> {
+  const database = await openSessionDb();
+  const handle = await new Promise<ProjectFolderHandle | null>((resolve, reject) => {
+    const request = database.transaction(STORE_NAME, "readonly").objectStore(STORE_NAME).get(KEY);
+    request.onsuccess = () => resolve((request.result as ProjectFolderHandle | undefined) ?? null);
+    request.onerror = () => reject(request.error ?? new Error("Não foi possível recuperar o armazenamento local."));
   });
-  db.close();
+  database.close();
   return handle;
 }
 
-export async function requestProjectFolderPermission(
-  handle: FileSystemDirectoryHandle,
-): Promise<boolean> {
+export async function requestProjectFolderPermission(handle: ProjectFolderHandle): Promise<boolean> {
+  if (typeof handle === "object" && "kind" in handle && handle.kind === "indexeddb") return true;
   const permissionHandle = handle as DirectoryPermissionHandle;
   const permission = await permissionHandle.queryPermission({ mode: "readwrite" });
   if (permission === "granted") return true;
