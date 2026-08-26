@@ -2,10 +2,11 @@ export type UUID = string;
 export type Position = 'GR' | 'PE' | 'LE' | 'CE' | 'LD' | 'PD' | 'PIV';
 export type DataSource = 'MATCH_SHEET' | 'MANUAL_STATS' | 'ANDEBOL_STATS' | 'VIDEO';
 export type DataQualityLevel = 0 | 1 | 2 | 3;
-export interface Club { id: UUID; name: string; shortName?: string; country?: string; createdAt: string; updatedAt: string; }
-export interface Team { id: UUID; clubId: UUID; name: string; category: string; gender: 'F' | 'M' | 'MIXED'; active: boolean; createdAt: string; updatedAt: string; }
+export interface HpiSnapshot { score: number; label?: string; version?: string; source: 'ANDEBOL_STATS'; updatedAt: string; sampleSize?: number; }
+export interface Club { id: UUID; name: string; shortName?: string; country?: string; logoPath?: string; createdAt: string; updatedAt: string; }
+export interface Team { id: UUID; clubId: UUID; name: string; category: string; gender: 'F' | 'M' | 'MIXED'; logoPath?: string; active: boolean; createdAt: string; updatedAt: string; }
 export interface Season { id: UUID; name: string; startDate?: string; endDate?: string; active: boolean; }
-export interface Player { id: UUID; firstName: string; lastName: string; displayName: string; birthDate?: string; shirtNumber?: number; position?: Position; hand?: 'LEFT' | 'RIGHT' | 'BOTH'; photoPath?: string; active: boolean; createdAt: string; updatedAt: string; }
+export interface Player { id: UUID; firstName: string; lastName: string; displayName: string; birthDate?: string; shirtNumber?: number; position?: Position; hand?: 'LEFT' | 'RIGHT' | 'BOTH'; photoPath?: string; hpi?: HpiSnapshot; active: boolean; createdAt: string; updatedAt: string; }
 export interface PlayerTeamSeason { id: UUID; playerId: UUID; teamId: UUID; seasonId: UUID; shirtNumber?: number; position?: Position; startDate?: string; endDate?: string; }
 export interface Competition { id: UUID; name: string; seasonId: UUID; category?: string; }
 export interface Match { id: UUID; seasonId: UUID; competitionId?: UUID; teamId: UUID; opponentTeamId?: UUID; opponentName: string; date: string; venue?: string; homeAway: 'HOME' | 'AWAY' | 'NEUTRAL'; goalsFor?: number; goalsAgainst?: number; status: 'PLANNED' | 'IN_PROGRESS' | 'COMPLETED'; sourceVideoPath?: string; videoDurationSeconds?: number; dataQualityLevel?: DataQualityLevel; dataSources?: DataSource[]; createdAt: string; updatedAt: string; }
