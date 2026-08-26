@@ -2,91 +2,30 @@
 
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
-import { Plus, Trash2, Users } from 'lucide-react'
+import { Plus, Trash2, Users, Pencil, Check, X, Camera, Trophy } from 'lucide-react'
 import { db } from '../../src/lib/storage/db'
 import { createId } from '../../src/lib/storage/id'
-import type { Club, Team } from '../../src/lib/storage/types'
+import { fileToOptimizedDataUrl } from '../../src/lib/media/image'
+import type { Club, Player, PlayerTeamSeason, Season, Team } from '../../src/lib/storage/types'
 import '../dashboard.css'
 
 export default function TeamsPage() {
-  const [teams, setTeams] = useState<Team[]>([])
-  const [clubs, setClubs] = useState<Club[]>([])
-  const [name, setName] = useState('')
-  const [category, setCategory] = useState('Seniores')
-  const [gender, setGender] = useState<Team['gender']>('F')
-  const [clubId, setClubId] = useState('')
-  const [clubName, setClubName] = useState('')
-  const [error, setError] = useState('')
-
-  async function load() {
-    if (!db) return
-    const [nextTeams, nextClubs] = await Promise.all([
-      db.teams.orderBy('name').toArray(),
-      db.clubs.orderBy('name').toArray(),
-    ])
-    setTeams(nextTeams)
-    setClubs(nextClubs)
-    setClubId(current => current || nextClubs[0]?.id || '')
-  }
-
+  const [teams, setTeams] = useState<Team[]>([]); const [clubs, setClubs] = useState<Club[]>([]); const [players, setPlayers] = useState<Player[]>([]); const [relations, setRelations] = useState<PlayerTeamSeason[]>([]); const [seasons, setSeasons] = useState<Season[]>([])
+  const [name, setName] = useState(''); const [category, setCategory] = useState('Seniores'); const [gender, setGender] = useState<Team['gender']>('F'); const [clubId, setClubId] = useState(''); const [clubName, setClubName] = useState(''); const [error, setError] = useState(''); const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null)
+  const [editingTeamId, setEditingTeamId] = useState<string | null>(null); const [editingClubId, setEditingClubId] = useState<string | null>(null); const [editName, setEditName] = useState(''); const [editCategory, setEditCategory] = useState(''); const [editGender, setEditGender] = useState<Team['gender']>('F'); const [editClubId, setEditClubId] = useState(''); const [editClubName, setEditClubName] = useState('')
+  async function load() { if (!db) return; const [nextTeams, nextClubs, nextPlayers, nextRelations, nextSeasons] = await Promise.all([db.teams.orderBy('name').toArray(), db.clubs.orderBy('name').toArray(), db.players.toArray(), db.playerTeamSeasons.toArray(), db.seasons.orderBy('name').reverse().toArray()]); setTeams(nextTeams); setClubs(nextClubs); setPlayers(nextPlayers); setRelations(nextRelations); setSeasons(nextSeasons); setClubId(current => current || nextClubs[0]?.id || '') }
   useEffect(() => { void load() }, [])
-
-  async function addClub(e: React.FormEvent) {
-    e.preventDefault()
-    if (!db || !clubName.trim()) return
-    const now = new Date().toISOString()
-    const id = createId()
-    await db.clubs.add({ id, name: clubName.trim(), createdAt: now, updatedAt: now })
-    setClubName('')
-    setClubId(id)
-    await load()
-  }
-
-  async function addTeam(e: React.FormEvent) {
-    e.preventDefault()
-    if (!db || !name.trim()) return
-    if (!clubId) {
-      setError('Cria ou seleciona um clube antes de criar a equipa.')
-      return
-    }
-    setError('')
-    const now = new Date().toISOString()
-    await db.teams.add({ id: createId(), clubId, name: name.trim(), category, gender, active: true, createdAt: now, updatedAt: now })
-    setName('')
-    await load()
-  }
-
-  async function remove(id: string) {
-    if (!db || !window.confirm('Apagar esta equipa?')) return
-    await db.teams.delete(id)
-    await load()
-  }
-
-  const clubNames = new Map(clubs.map(club => [club.id, club.name]))
-
-  return <main className="content standalonePage">
-    <header className="topbar"><div><p className="eyebrow">GESTÃO</p><h1>Equipas</h1></div></header>
-    <section className="section">
-      <div className="sectionHeader"><div><p className="eyebrow">ESTRUTURA</p><h3>Clube e equipas</h3></div><span className="status">{teams.length} equipas</span></div>
-      <form onSubmit={addClub} className="localForm">
-        <input value={clubName} onChange={e => setClubName(e.target.value)} placeholder="Nome do clube" aria-label="Nome do clube" />
-        <button type="submit"><Plus size={17}/> Criar clube</button>
-      </form>
-      <form onSubmit={addTeam} className="localForm">
-        <select value={clubId} onChange={e => setClubId(e.target.value)} aria-label="Clube">
-          <option value="">Selecionar clube</option>
-          {clubs.map(club => <option key={club.id} value={club.id}>{club.name}</option>)}
-        </select>
-        <input value={name} onChange={e => setName(e.target.value)} placeholder="Nome da equipa" required />
-        <input value={category} onChange={e => setCategory(e.target.value)} placeholder="Categoria" />
-        <select value={gender} onChange={e => setGender(e.target.value as Team['gender'])}><option value="F">Feminino</option><option value="M">Masculino</option><option value="MIXED">Misto</option></select>
-        <button type="submit"><Plus size={17}/> Criar equipa</button>
-      </form>
-      {error && <p className="status" role="alert">{error}</p>}
-      <div className="localList">
-        {teams.length === 0 && <div className="emptyState"><Users size={30}/><strong>Ainda não existem equipas</strong><span>Cria o clube e a primeira equipa acima.</span></div>}
-        {teams.map(team => <div className="localRow" key={team.id}><Link href={`/teams/${team.id}`} style={{ flex: 1 }}><strong>{team.name}</strong><span>{clubNames.get(team.clubId) ?? 'Clube desconhecido'} · {team.category} · {team.gender === 'F' ? 'Feminino' : team.gender === 'M' ? 'Masculino' : 'Misto'}</span></Link><button className="iconButton" onClick={() => void remove(team.id)} aria-label={`Apagar ${team.name}`}><Trash2 size={17}/></button></div>)}
-      </div>
-    </section>
+  async function addClub(e: React.FormEvent) { e.preventDefault(); if (!db || !clubName.trim()) return; const now = new Date().toISOString(); const id = createId(); await db.clubs.add({ id, name: clubName.trim(), createdAt: now, updatedAt: now }); setClubName(''); setClubId(id); await load() }
+  async function addTeam(e: React.FormEvent) { e.preventDefault(); if (!db || !name.trim()) return; if (!clubId) { setError('Cria ou seleciona um clube antes de criar a equipa.'); return }; setError(''); const now = new Date().toISOString(); await db.teams.add({ id: createId(), clubId, name: name.trim(), category, gender, active: true, createdAt: now, updatedAt: now }); setName(''); await load() }
+  function beginTeamEdit(team: Team) { setEditingTeamId(team.id); setEditName(team.name); setEditCategory(team.category); setEditGender(team.gender); setEditClubId(team.clubId) }
+  async function saveTeamEdit() { if (!db || !editingTeamId || !editName.trim() || !editClubId) return; const current = await db.teams.get(editingTeamId); if (!current) return; await db.teams.put({ ...current, name: editName.trim(), category: editCategory.trim(), gender: editGender, clubId: editClubId, updatedAt: new Date().toISOString() }); setEditingTeamId(null); await load() }
+  function beginClubEdit(club: Club) { setEditingClubId(club.id); setEditClubName(club.name) }
+  async function saveClubEdit() { if (!db || !editingClubId || !editClubName.trim()) return; const current = await db.clubs.get(editingClubId); if (!current) return; await db.clubs.put({ ...current, name: editClubName.trim(), updatedAt: new Date().toISOString() }); setEditingClubId(null); await load() }
+  async function removeTeam(id: string) { if (!db || !window.confirm('Apagar esta equipa?')) return; await db.teams.delete(id); if (selectedTeamId === id) setSelectedTeamId(null); await load() }
+  async function removeClub(id: string) { if (!db || !window.confirm('Apagar este clube? As equipas associadas terão de ser tratadas primeiro.')) return; const linked = await db.teams.where('clubId').equals(id).count(); if (linked) { window.alert('Não é possível apagar o clube enquanto tiver equipas associadas.'); return } await db.clubs.delete(id); await load() }
+  async function changeClubLogo(club: Club, file?: File) { if (!db || !file) return; try { const logoPath = await fileToOptimizedDataUrl(file, 600, .9); await db.clubs.update(club.id, { logoPath, updatedAt: new Date().toISOString() }); await load() } catch (cause) { setError(cause instanceof Error ? cause.message : 'Não foi possível carregar o logótipo.') } }
+  const clubNames = new Map(clubs.map(club => [club.id, club.name])); const selectedTeam = teams.find(team => team.id === selectedTeamId); const selectedClub = selectedTeam ? clubs.find(club => club.id === selectedTeam.clubId) : undefined; const selectedRelations = selectedTeam ? relations.filter(item => item.teamId === selectedTeam.id) : []; const selectedPlayers = selectedRelations.map(relation => ({ relation, player: players.find(player => player.id === relation.playerId), season: seasons.find(season => season.id === relation.seasonId) })).filter(item => item.player)
+  return <main className="content standalonePage"><header className="topbar"><div><p className="eyebrow">GESTÃO</p><h1>Equipas</h1></div></header><section className="section"><div className="sectionHeader"><div><p className="eyebrow">ESTRUTURA</p><h3>Clube e equipas</h3></div><span className="status">{teams.length} equipas</span></div><form onSubmit={addClub} className="localForm"><input value={clubName} onChange={e => setClubName(e.target.value)} placeholder="Nome do clube" aria-label="Nome do clube"/><button type="submit"><Plus size={17}/> Criar clube</button></form>{clubs.length > 0 && <div className="localList" style={{ marginTop: 12 }}>{clubs.map(club => editingClubId === club.id ? <div className="localRow" key={club.id}><input value={editClubName} onChange={e => setEditClubName(e.target.value)}/><button className="button" onClick={() => void saveClubEdit()}><Check size={17}/> Guardar</button><button className="button" onClick={() => setEditingClubId(null)}><X size={17}/> Cancelar</button></div> : <div className="localRow" key={club.id}><div style={{display:'flex',alignItems:'center',gap:10,flex:1}}>{club.logoPath ? <img className="miniLogo" src={club.logoPath} alt=""/> : null}<span><strong>{club.name}</strong><small style={{ display: 'block', opacity: .7 }}>Clube</small></span></div><button className="button" onClick={() => beginClubEdit(club)}><Pencil size={17}/> Editar</button><button className="button" onClick={() => void removeClub(club.id)}><Trash2 size={17}/> Eliminar</button></div>)}</div>}<form onSubmit={addTeam} className="localForm"><select value={clubId} onChange={e => setClubId(e.target.value)} aria-label="Clube"><option value="">Selecionar clube</option>{clubs.map(club => <option key={club.id} value={club.id}>{club.name}</option>)}</select><input value={name} onChange={e => setName(e.target.value)} placeholder="Nome da equipa" required/><input value={category} onChange={e => setCategory(e.target.value)} placeholder="Categoria"/><select value={gender} onChange={e => setGender(e.target.value as Team['gender'])}><option value="F">Feminino</option><option value="M">Masculino</option><option value="MIXED">Misto</option></select><button type="submit"><Plus size={17}/> Criar equipa</button></form>{error && <p className="status" role="alert">{error}</p>}<div className="localList">{teams.length === 0 && <div className="emptyState"><Users size={30}/><strong>Ainda não existem equipas</strong><span>Cria o clube e a primeira equipa acima.</span></div>}{teams.map(team => editingTeamId === team.id ? <div className="localRow" key={team.id} style={{ flexWrap: 'wrap' }}><input value={editName} onChange={e => setEditName(e.target.value)} aria-label="Nome da equipa"/><input value={editCategory} onChange={e => setEditCategory(e.target.value)} aria-label="Categoria"/><select value={editGender} onChange={e => setEditGender(e.target.value as Team['gender'])}><option value="F">Feminino</option><option value="M">Masculino</option><option value="MIXED">Misto</option></select><select value={editClubId} onChange={e => setEditClubId(e.target.value)} aria-label="Clube">{clubs.map(club => <option key={club.id} value={club.id}>{club.name}</option>)}</select><button className="button" onClick={() => void saveTeamEdit()}><Check size={17}/> Guardar</button><button className="button" onClick={() => setEditingTeamId(null)}><X size={17}/> Cancelar</button></div> : <div className="localRow" key={team.id}><button className="button" onClick={() => setSelectedTeamId(team.id)}><strong>{team.name}</strong><span>{clubNames.get(team.clubId) ?? 'Clube desconhecido'} · {team.category} · {team.gender === 'F' ? 'Feminino' : team.gender === 'M' ? 'Masculino' : 'Misto'}</span></button><button className="button" onClick={() => beginTeamEdit(team)}><Pencil size={17}/> Editar</button><button className="button" onClick={() => void removeTeam(team.id)}><Trash2 size={17}/> Eliminar</button></div>)}</div></section>
+    {selectedTeam && <section className="section"><div className="teamHero"><div>{selectedClub?.logoPath ? <img className="teamLogo" src={selectedClub.logoPath} alt={`Logótipo ${selectedClub.name}`}/> : <div className="teamLogoFallback">{selectedTeam.name.split(' ').filter(Boolean).slice(0,2).map(x=>x[0]).join('').toUpperCase()}</div>}<div className="logoPicker"><label><Camera size={14}/> Alterar logótipo do clube<input type="file" accept="image/*" onChange={e => void changeClubLogo(selectedClub!, e.target.files?.[0])} disabled={!selectedClub}/></label></div></div><div><div style={{display:'flex',justifyContent:'space-between',gap:10}}><span className="eyebrow">FICHA DE EQUIPA · ANDEBOL</span><button className="iconButton" onClick={() => setSelectedTeamId(null)} aria-label="Fechar ficha"><X size={19}/></button></div><h2 style={{fontSize:30,marginBottom:8}}>{selectedTeam.name}</h2><div className="playerMeta"><span>{selectedClub?.name ?? 'Clube'}</span><span>{selectedTeam.category}</span><span>{selectedTeam.gender === 'F' ? 'Feminino' : selectedTeam.gender === 'M' ? 'Masculino' : 'Misto'}</span></div><p>Perfil coletivo, identidade do clube e plantel.</p></div></div><div className="section"><div className="sectionHeader"><div><h2>Plantel</h2><p>Atletas associadas a esta equipa.</p></div><Users size={24}/></div><div className="localList">{selectedPlayers.length === 0 && <div className="emptyState"><strong>Sem atletas associadas</strong><span>Adiciona atletas e liga-as a esta equipa.</span></div>}{selectedPlayers.map(({relation,player,season}) => <Link href={`/players/${player!.id}`} className="localRow" key={relation.id} style={{textDecoration:'none',color:'inherit'}}><div style={{display:'flex',alignItems:'center',gap:12}}>{player!.photoPath ? <img className="miniLogo" src={player!.photoPath} alt=""/> : null}<div><strong>{player!.displayName}</strong><span>{relation.position ?? player!.position ?? 'Sem posição'} · {season?.name ?? 'Sem época'}{relation.shirtNumber ? ` · #${relation.shirtNumber}` : ''}</span></div></div>{player!.hpi ? <span><strong>HPI {player!.hpi.score}</strong></span> : null}</Link>)}</div></div><div className="explorerGrid"><div className="explorerCard"><span>Atletas</span><strong>{selectedPlayers.length}</strong><small>Relações de plantel</small></div><div className="explorerCard"><span>Épocas</span><strong>{new Set(selectedRelations.map(item=>item.seasonId)).size}</strong><small>Com atletas associadas</small></div><div className="explorerCard"><span>Clube</span><strong>{selectedClub?.shortName ?? '—'}</strong><small>{selectedClub?.name ?? 'Não definido'}</small></div><div className="explorerCard"><span>HPI médio</span><strong>{selectedPlayers.filter(item=>item.player?.hpi).length ? Math.round(selectedPlayers.reduce((sum,item)=>sum+(item.player?.hpi?.score ?? 0),0)/selectedPlayers.filter(item=>item.player?.hpi).length) : '—'}</strong><small>Atletas com HPI recebido</small></div></div></section>}
   </main>
 }

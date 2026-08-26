@@ -19,19 +19,20 @@ async function seedDatabase(database: HandballPerformanceDB, homeAway: 'HOME' | 
 }
 
 describe('Performance OS ↔ Andebol-Stats canonical match contract', () => {
-  it('exports the canonical v1.1.0 setup package', async () => {
+  it('exports the canonical v1.3.0 setup package', async () => {
     const database = new HandballPerformanceDB()
     await seedDatabase(database)
 
     const pkg = await exportMatchPackage(database, 'm1')
     expect(pkg.schemaVersion).toBe(MATCH_CONTRACT_VERSION)
-    expect(pkg.schemaVersion).toBe('1.1.0')
+    expect(pkg.schemaVersion).toBe('1.3.0')
     expect(pkg.source).toBe('handball-performance-os')
     expect(pkg.match.homeTeamId).toBe('t1')
     expect(pkg.match.awayTeamId).toBe('t2')
     expect(pkg.players[0]).toMatchObject({ id:'p1', shirtNumber:7, position:'CE', teamId:'t1' })
     expect(pkg.roster[0]).toMatchObject({ id:'sq1', playerId:'p1', starter:true })
     expect(pkg.events).toEqual([])
+    expect(pkg.video).toEqual({ anchors: {}, clips: [] })
 
     await database.delete()
   })
@@ -41,7 +42,7 @@ describe('Performance OS ↔ Andebol-Stats canonical match contract', () => {
     await seedDatabase(database, 'AWAY')
 
     const payload = await exportMatchPackage(database, 'm1')
-    const result = { ...payload, match: { ...payload.match, homeScore: 28, awayScore: 31, status:'finished' as const }, events: [{ id:'e1', matchId:'m1', period:1 as const, gameTime:120, teamId:'t1', playerId:'p1', type:'shot', metadata:{ shot:{ shooterId:'p1', position:'CE', zone:'Z4', distance:'7m', type:'jump', outcome:'goal', xg:0.62 } } }] }
+    const result = { ...payload, match: { ...payload.match, homeScore: 28, awayScore: 31, status:'finished' as const }, events: [{ id:'e1', matchId:'m1', period:1 as const, gameTime:120, timestampKnown:true, teamId:'t1', playerId:'p1', type:'shot', metadata:{ shot:{ shooterId:'p1', position:'CE', zone:'Z4', distance:'7m', type:'jump', outcome:'goal', xg:0.62 } } }] }
 
     await importAndebolStatsResult(database, result)
     const match = await database.matches.get('m1')
