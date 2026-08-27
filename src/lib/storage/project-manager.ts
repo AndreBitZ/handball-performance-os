@@ -8,7 +8,6 @@ export type ProjectOpenResult = {
   created: boolean
 }
 
-/** Create a brand-new local project and remember its handle for this browser. */
 export async function createLocalProject(): Promise<ProjectOpenResult> {
   const project = await openProjectFolder()
   const manifest = await initializeProjectStorage(project.handle)
@@ -16,17 +15,11 @@ export async function createLocalProject(): Promise<ProjectOpenResult> {
   return { project, manifest, created: true }
 }
 
-/** Open an existing local project selected by the user and validate its manifest. */
 export async function openLocalProject(): Promise<ProjectOpenResult> {
   const project = await openProjectFolder()
   const manifest = await readProjectManifest(project.handle)
-
-  // OPFS/IndexedDB handles do not expose the File System Access permission API.
   const permitted = await requestProjectFolderPermissionIfSupported(project.handle)
-  if (!permitted) {
-    throw new Error('A aplicação não tem permissão para escrever na pasta do projeto.')
-  }
-
+  if (!permitted) throw new Error('A aplicação não tem permissão para escrever na pasta do projeto.')
   await saveProjectFolderHandle(project.handle)
   return { project, manifest, created: false }
 }
@@ -36,7 +29,11 @@ async function requestProjectFolderPermissionIfSupported(handle: ProjectFolderHa
   return requestProjectFolderPermission(handle)
 }
 
-/** Reconnect to the last project without showing the folder picker again. */
+function modeFromHandle(handle: ProjectFolderHandle): ProjectFolder['mode'] {
+  if (typeof handle === 'object' && 'kind' in handle) return handle.kind
+  return 'filesystem'
+}
+
 export async function reconnectLocalProject(): Promise<ProjectOpenResult | null> {
   const handle = await loadProjectFolderHandle()
   if (!handle) return null
@@ -49,7 +46,7 @@ export async function reconnectLocalProject(): Promise<ProjectOpenResult | null>
     project: {
       name: 'Handball Performance OS',
       handle,
-      mode: typeof handle === 'object' && 'kind' in handle ? handle.kind : 'filesystem',
+      mode: modeFromHandle(handle),
     },
     manifest,
     created: false,
