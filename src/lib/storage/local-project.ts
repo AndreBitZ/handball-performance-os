@@ -30,8 +30,19 @@ export const PROJECT_FOLDERS: readonly ProjectFolderName[] = [
 const FILE_DB = "handball-performance-project-files";
 const FILE_STORE = "files";
 const OPFS_ROOT = "handball-performance-os";
+const PROJECT_MANIFEST = "project-manifest.json";
+const PROJECT_VERSION = 1;
 
 type StoredFile = { key: string; content: string; updatedAt: string };
+
+type ProjectManifest = {
+  schemaVersion: number;
+  projectName: string;
+  createdAt: string;
+  updatedAt: string;
+  storage: "filesystem" | "opfs" | "indexeddb";
+  folders: readonly ProjectFolderName[];
+};
 
 function openFileDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -54,7 +65,20 @@ function fileKey(folder: LocalProjectHandle, relativeFolder: ProjectFolderName, 
   return `${folder.name}/${relativeFolder}/${filename}`;
 }
 
+async function requestPersistentStorage() {
+  if (typeof navigator === "undefined" || !navigator.storage) return false;
+  try {
+    if (typeof navigator.storage.persist === "function") return await navigator.storage.persist();
+  } catch {
+    // Safari can reject persistence requests depending on browser mode/storage policy.
+  }
+  return false;
+}
+
 async function opfsProjectDirectory(folder: LocalProjectHandle & { kind: "opfs" }) {
+  if (typeof navigator === "undefined" || typeof navigator.storage?.getDirectory !== "function") {
+    throw new Error("O armazenamento OPFS não está disponível neste navegador.");
+  }
   const root = await navigator.storage.getDirectory();
   const project = await root.getDirectoryHandle(OPFS_ROOT, { create: true });
   return project.getDirectoryHandle(folder.name, { create: true });
@@ -65,8 +89,11 @@ async function opfsWrite(folder: LocalProjectHandle & { kind: "opfs" }, relative
   const directory = await project.getDirectoryHandle(relativeFolder, { create: true });
   const file = await directory.getFileHandle(filename, { create: true });
   const writable = await file.createWritable();
-  await writable.write(content);
-  await writable.close();
+  try {
+    await writable.write(content);
+  } finally {
+    await writable.close();
+  }
 }
 
 async function opfsRead(folder: LocalProjectHandle & { kind: "opfs" }, relativeFolder: ProjectFolderName, filename: string) {
@@ -119,27 +146,47 @@ async function localList(folder: LocalProjectHandle, relativeFolder: ProjectFold
   return values.map((item) => item.key.slice(prefix.length)).sort();
 }
 
+async function initializeProject(folder: ProjectFolder): Promise<ProjectFolder> {
+  for (const relativeFolder of PROJECT_FOLDERS) {
+    if (folder.mode === "filesystem") {
+      await folder.handle.getDirectoryHandle(relativeFolder, { create: true });
+    } else if (folder.mode === "opfs") {
+      await opfsProjectDirectory(folder.handle as LocalProjectHandle & { kind: "opfs" }).then((project) => project.getDirectoryHandle(relativeFolder, { create: true }));
+    } else {
+      await localWrite(folder.handle as LocalProjectHandle, relativeFolder, ".folder", "local");
+    }
+  }
+  const now = new Date().toISOString();
+  const manifest: ProjectManifest = {
+    schemaVersion: PROJECT_VERSION,
+    projectName: folder.name,
+    createdAt: now,
+    updatedAt: now,
+    storage: folder.mode,
+    folders: PROJECT_FOLDERS,
+  };
+  await writeProjectFile(folder.handle, "database", PROJECT_MANIFEST, JSON.stringify(manifest, null, 2));
+  if (folder.mode !== "filesystem") await requestPersistentStorage();
+  return folder;
+}
+
 export async function openProjectFolder(): Promise<ProjectFolder> {
   if (typeof window === "undefined") throw new Error("O armazenamento local só está disponível no navegador.");
 
   if ("showDirectoryPicker" in window) {
     const picker = (window as Window & { showDirectoryPicker: () => Promise<FileSystemDirectoryHandle> }).showDirectoryPicker;
     const handle = await picker();
-    for (const folder of PROJECT_FOLDERS) await handle.getDirectoryHandle(folder, { create: true });
-    return { name: "Handball Performance OS", handle, mode: "filesystem" };
+    return initializeProject({ name: "Handball Performance OS", handle, mode: "filesystem" });
   }
 
-  if (typeof navigator !== "undefined" && navigator.storage?.getDirectory) {
+  if (typeof navigator !== "undefined" && typeof navigator.storage?.getDirectory === "function") {
     const handle: LocalProjectHandle = { kind: "opfs", name: "Handball Performance OS" };
-    const project = await opfsProjectDirectory(handle as LocalProjectHandle & { kind: "opfs" });
-    for (const folder of PROJECT_FOLDERS) await project.getDirectoryHandle(folder, { create: true });
-    return { name: handle.name, handle, mode: "opfs" };
+    return initializeProject({ name: handle.name, handle, mode: "opfs" });
   }
 
   if ("indexedDB" in window) {
     const handle: LocalProjectHandle = { kind: "indexeddb", name: "Handball Performance OS — Local" };
-    for (const folder of PROJECT_FOLDERS) await localWrite(handle, folder, ".folder", "local");
-    return { name: handle.name, handle, mode: "indexeddb" };
+    return initializeProject({ name: handle.name, handle, mode: "indexeddb" });
   }
 
   throw new Error("Este navegador não disponibiliza armazenamento local compatível.");
@@ -151,8 +198,11 @@ export async function writeProjectFile(folder: ProjectFolderHandle, relativeFold
   const directory = await folder.getDirectoryHandle(relativeFolder, { create: true });
   const file = await directory.getFileHandle(filename, { create: true });
   const writable = await file.createWritable();
-  await writable.write(content);
-  await writable.close();
+  try {
+    await writable.write(content);
+  } finally {
+    await writable.close();
+  }
 }
 
 export async function readProjectFile(folder: ProjectFolderHandle, relativeFolder: ProjectFolderName, filename: string): Promise<string> {
