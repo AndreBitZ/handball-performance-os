@@ -30,7 +30,10 @@ async function requestProjectFolderPermissionIfSupported(handle: ProjectFolderHa
 }
 
 function modeFromHandle(handle: ProjectFolderHandle): ProjectFolder['mode'] {
-  if (typeof handle === 'object' && 'kind' in handle) return handle.kind
+  if (typeof handle === 'object' && 'kind' in handle) {
+    const kind = handle.kind
+    return kind === 'directory' ? 'opfs' : kind
+  }
   return 'filesystem'
 }
 
