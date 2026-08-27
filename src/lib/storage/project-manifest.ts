@@ -10,6 +10,10 @@ export type ProjectManifest = {
   updatedAt: string
 }
 
+function isOpfsHandle(root: ProjectFolderHandle): root is FileSystemDirectoryHandle {
+  return typeof root === 'object' && root !== null && 'kind' in root && root.kind === 'directory'
+}
+
 export async function initializeProjectStorage(
   root: ProjectFolderHandle,
 ): Promise<ProjectManifest> {
@@ -21,13 +25,13 @@ export async function initializeProjectStorage(
     updatedAt: now,
   }
 
-  if (typeof root === 'object' && 'kind' in root) {
+  if (isOpfsHandle(root)) {
     for (const folder of PROJECT_FOLDERS) {
-      await writeProjectFile(root, folder, '.folder', 'local')
+      await root.getDirectoryHandle(folder, { create: true })
     }
   } else {
     for (const folder of PROJECT_FOLDERS) {
-      await root.getDirectoryHandle(folder, { create: true })
+      await writeProjectFile(root, folder, '.folder', 'local')
     }
   }
 
