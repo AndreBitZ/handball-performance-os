@@ -41,8 +41,10 @@ export async function loadProjectFolderHandle(): Promise<ProjectFolderHandle | n
 }
 
 export async function requestProjectFolderPermission(handle: ProjectFolderHandle): Promise<boolean> {
-  if (typeof handle === "object" && "kind" in handle && handle.kind === "indexeddb") return true;
+  if (typeof handle === "object" && "kind" in handle && (handle as LocalProjectHandle).kind === "opfs") return true;
+  if (typeof handle === "object" && "kind" in handle && (handle as LocalProjectHandle).kind === "indexeddb") return true;
   const permissionHandle = handle as DirectoryPermissionHandle;
+  if (!permissionHandle.queryPermission || !permissionHandle.requestPermission) return false;
   const permission = await permissionHandle.queryPermission({ mode: "readwrite" });
   if (permission === "granted") return true;
   const requested = await permissionHandle.requestPermission({ mode: "readwrite" });
