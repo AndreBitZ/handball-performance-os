@@ -1,4 +1,4 @@
-import { PROJECT_FOLDERS, readProjectFile, writeProjectFile, type ProjectFolderHandle } from './local-project'
+import { PROJECT_FOLDERS, readProjectFile, writeProjectFile, type ProjectFolderHandle, type ProjectFolderName } from './local-project'
 
 export const PROJECT_MANIFEST_FILENAME = 'project.json'
 export const PROJECT_MANIFEST_VERSION = 1 as const
@@ -21,7 +21,7 @@ export async function initializeProjectStorage(
     updatedAt: now,
   }
 
-  if ('kind' in root) {
+  if (typeof root === 'object' && 'kind' in root) {
     for (const folder of PROJECT_FOLDERS) {
       await writeProjectFile(root, folder, '.folder', 'local')
     }
