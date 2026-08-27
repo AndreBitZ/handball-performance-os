@@ -146,12 +146,15 @@ async function localList(folder: LocalProjectHandle, relativeFolder: ProjectFold
   return values.map((item) => item.key.slice(prefix.length)).sort();
 }
 
-async function initializeProject(folder: ProjectFolder): Promise<ProjectFolder> {
+export async function initializeProject(folder: ProjectFolder): Promise<ProjectFolder> {
   for (const relativeFolder of PROJECT_FOLDERS) {
     if (folder.mode === "filesystem") {
-      await folder.handle.getDirectoryHandle(relativeFolder, { create: true });
+      const filesystemHandle = folder.handle as FileSystemDirectoryHandle;
+      await filesystemHandle.getDirectoryHandle(relativeFolder, { create: true });
     } else if (folder.mode === "opfs") {
-      await opfsProjectDirectory(folder.handle as LocalProjectHandle & { kind: "opfs" }).then((project) => project.getDirectoryHandle(relativeFolder, { create: true }));
+      const opfsHandle = folder.handle as LocalProjectHandle & { kind: "opfs" };
+      const project = await opfsProjectDirectory(opfsHandle);
+      await project.getDirectoryHandle(relativeFolder, { create: true });
     } else {
       await localWrite(folder.handle as LocalProjectHandle, relativeFolder, ".folder", "local");
     }
