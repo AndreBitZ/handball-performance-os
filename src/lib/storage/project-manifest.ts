@@ -1,5 +1,4 @@
-import { PROJECT_FOLDERS, type ProjectFolderName } from './local-project'
-import { readProjectFile, writeProjectFile } from './local-project'
+import { PROJECT_FOLDERS, readProjectFile, writeProjectFile, type ProjectFolderHandle } from './local-project'
 
 export const PROJECT_MANIFEST_FILENAME = 'project.json'
 export const PROJECT_MANIFEST_VERSION = 1 as const
@@ -12,7 +11,7 @@ export type ProjectManifest = {
 }
 
 export async function initializeProjectStorage(
-  root: FileSystemDirectoryHandle,
+  root: ProjectFolderHandle,
 ): Promise<ProjectManifest> {
   const now = new Date().toISOString()
   const manifest: ProjectManifest = {
@@ -22,8 +21,14 @@ export async function initializeProjectStorage(
     updatedAt: now,
   }
 
-  for (const folder of PROJECT_FOLDERS) {
-    await root.getDirectoryHandle(folder, { create: true })
+  if ('kind' in root) {
+    for (const folder of PROJECT_FOLDERS) {
+      await writeProjectFile(root, folder, '.folder', 'local')
+    }
+  } else {
+    for (const folder of PROJECT_FOLDERS) {
+      await root.getDirectoryHandle(folder, { create: true })
+    }
   }
 
   await writeProjectFile(root, 'database', PROJECT_MANIFEST_FILENAME, JSON.stringify(manifest, null, 2))
@@ -31,7 +36,7 @@ export async function initializeProjectStorage(
 }
 
 export async function readProjectManifest(
-  root: FileSystemDirectoryHandle,
+  root: ProjectFolderHandle,
 ): Promise<ProjectManifest> {
   const text = await readProjectFile(root, 'database', PROJECT_MANIFEST_FILENAME)
   let manifest: unknown
