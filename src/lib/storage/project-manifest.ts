@@ -10,8 +10,8 @@ export type ProjectManifest = {
   updatedAt: string
 }
 
-function isOpfsHandle(root: ProjectFolderHandle): root is FileSystemDirectoryHandle {
-  return typeof root === 'object' && root !== null && 'kind' in root && root.kind === 'directory'
+function hasDirectoryHandleApi(root: ProjectFolderHandle): root is FileSystemDirectoryHandle {
+  return typeof root === 'object' && root !== null && 'getDirectoryHandle' in root
 }
 
 export async function initializeProjectStorage(
@@ -25,7 +25,7 @@ export async function initializeProjectStorage(
     updatedAt: now,
   }
 
-  if (isOpfsHandle(root)) {
+  if (hasDirectoryHandleApi(root)) {
     for (const folder of PROJECT_FOLDERS) {
       await root.getDirectoryHandle(folder, { create: true })
     }
