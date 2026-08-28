@@ -9,6 +9,7 @@ export interface Season { id: UUID; name: string; startDate?: string; endDate?: 
 export interface Player { id: UUID; firstName: string; lastName: string; displayName: string; birthDate?: string; shirtNumber?: number; position?: Position; hand?: 'LEFT' | 'RIGHT' | 'BOTH'; photoPath?: string; hpi?: HpiSnapshot; hpiHistory?: HpiSnapshot[]; active: boolean; createdAt: string; updatedAt: string; }
 export interface PlayerTeamSeason { id: UUID; playerId: UUID; teamId: UUID; seasonId: UUID; shirtNumber?: number; position?: Position; startDate?: string; endDate?: string; }
 export interface Competition { id: UUID; name: string; seasonId: UUID; category?: string; }
+export interface CompetitionTeam { id: UUID; competitionId: UUID; teamId: UUID; seasonId: UUID; }
 export interface Match { id: UUID; seasonId: UUID; competitionId?: UUID; teamId: UUID; opponentTeamId?: UUID; opponentName: string; date: string; venue?: string; homeAway: 'HOME' | 'AWAY' | 'NEUTRAL'; goalsFor?: number; goalsAgainst?: number; status: 'PLANNED' | 'IN_PROGRESS' | 'COMPLETED'; sourceVideoPath?: string; videoDurationSeconds?: number; dataQualityLevel?: DataQualityLevel; dataSources?: DataSource[]; createdAt: string; updatedAt: string; }
 export interface MatchSquad { id: UUID; matchId: UUID; playerId: UUID; teamId?: UUID; starter: boolean; captain: boolean; shirtNumber?: number; position?: Position; }
 export interface MatchPlayerInterval { id: UUID; matchId: UUID; playerId: UUID; period: 1 | 2; startSeconds: number; endSeconds?: number; createdAt: string; updatedAt: string; }
