@@ -1,42 +1,112 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Trash2, Swords, ArrowLeft, Save, Play, Pause, RotateCcw, ArrowLeftRight } from 'lucide-react'
+import { ArrowLeft, Save, Trash2 } from 'lucide-react'
 import { db } from '../../src/lib/storage/db'
 import { createId } from '../../src/lib/storage/id'
-import type { Competition, Match, MatchEvent, MatchSquad, Player, PlayerTeamSeason, Season, Team } from '../../src/lib/storage/types'
-import LiveCoding, { type LiveCodingEvent } from './live-coding'
+import type { Competition, Match, MatchSquad, Player, PlayerTeamSeason, Season, Team } from '../../src/lib/storage/types'
 import MatchReportLink from './report-link'
 import '../dashboard.css'
 
-const formatClock = (seconds: number) => `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`
-
 export default function GamesPage() {
-  const [matches, setMatches] = useState<Match[]>([]); const [teams, setTeams] = useState<Team[]>([]); const [seasons, setSeasons] = useState<Season[]>([]); const [competitions, setCompetitions] = useState<Competition[]>([])
-  const [teamId, setTeamId] = useState(''); const [seasonId, setSeasonId] = useState(''); const [competitionId, setCompetitionId] = useState(''); const [opponent, setOpponent] = useState(''); const [date, setDate] = useState(''); const [venue, setVenue] = useState(''); const [homeAway, setHomeAway] = useState<Match['homeAway']>('HOME')
-  const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null); const [players, setPlayers] = useState<Player[]>([]); const [relations, setRelations] = useState<PlayerTeamSeason[]>([]); const [squad, setSquad] = useState<MatchSquad[]>([]); const [saved, setSaved] = useState(false)
-  const [live, setLive] = useState(false); const [running, setRunning] = useState(false); const [period, setPeriod] = useState<1 | 2>(1); const [clock, setClock] = useState(0); const [ourScore, setOurScore] = useState(0); const [oppScore, setOppScore] = useState(0); const [onCourt, setOnCourt] = useState<string[]>([]); const [events, setEvents] = useState<MatchEvent[]>([])
+  const [matches, setMatches] = useState<Match[]>([])
+  const [teams, setTeams] = useState<Team[]>([])
+  const [seasons, setSeasons] = useState<Season[]>([])
+  const [competitions, setCompetitions] = useState<Competition[]>([])
+  const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null)
+  const [players, setPlayers] = useState<Player[]>([])
+  const [relations, setRelations] = useState<PlayerTeamSeason[]>([])
+  const [squad, setSquad] = useState<MatchSquad[]>([])
+  const [saved, setSaved] = useState(false)
 
-  async function load() { if (!db) return; const database = db; const [nextMatches, nextTeams, nextSeasons, nextCompetitions] = await Promise.all([database.matches.orderBy('date').reverse().toArray(), database.teams.orderBy('name').toArray(), database.seasons.orderBy('name').reverse().toArray(), database.competitions.orderBy('name').toArray()]); setMatches(nextMatches); setTeams(nextTeams); setSeasons(nextSeasons); setCompetitions(nextCompetitions); if (!teamId && nextTeams[0]) setTeamId(nextTeams[0].id); if (!seasonId && nextSeasons[0]) setSeasonId(nextSeasons[0].id) }
+  async function load() {
+    if (!db) return
+    const [m, t, s, c] = await Promise.all([
+      db.matches.orderBy('date').reverse().toArray(),
+      db.teams.orderBy('name').toArray(),
+      db.seasons.orderBy('name').reverse().toArray(),
+      db.competitions.orderBy('name').toArray(),
+    ])
+    setMatches(m); setTeams(t); setSeasons(s); setCompetitions(c)
+  }
+
   useEffect(() => { void load() }, [])
-  useEffect(() => { if (!running) return; const id = window.setInterval(() => setClock(v => { if (v >= 1800) { setRunning(false); return 1800 } return v + 1 }), 1000); return () => window.clearInterval(id) }, [running])
-  const seasonCompetitions = useMemo(() => competitions.filter(c => !seasonId || c.seasonId === seasonId), [competitions, seasonId])
-  async function openMatch(id: string) { if (!db) return; const database = db; const m = await database.matches.get(id); if (!m) return; const [p, r, sq, ev] = await Promise.all([database.players.orderBy('displayName').toArray(), database.playerTeamSeasons.where('[teamId+seasonId]').equals([m.teamId, m.seasonId]).toArray(), database.matchSquads.where('matchId').equals(id).toArray(), database.events.where('matchId').equals(id).sortBy('timestampSeconds')]); setSelectedMatchId(id); setPlayers(p); setRelations(r); setSquad(sq); setSaved(true); setEvents(ev); setLive(false); setRunning(false); setPeriod(1); setClock(0); setOurScore(m.goalsFor ?? 0); setOppScore(m.goalsAgainst ?? 0); setOnCourt(sq.filter(s => s.starter).slice(0, 7).map(s => s.playerId)) }
+
+  async function openMatch(id: string) {
+    if (!db) return
+    const match = await db.matches.get(id)
+    if (!match) return
+    const [allPlayers, allRelations, matchSquads] = await Promise.all([
+      db.players.orderBy('displayName').toArray(),
+      db.playerTeamSeasons.where('seasonId').equals(match.seasonId).toArray(),
+      db.matchSquads.where('matchId').equals(id).toArray(),
+    ])
+    setSelectedMatchId(id)
+    setPlayers(allPlayers)
+    setRelations(allRelations)
+    setSquad(matchSquads)
+    setSaved(true)
+  }
+
   const selectedMatch = matches.find(m => m.id === selectedMatchId) ?? null
-  const eligible = useMemo(() => { const ids = new Set(relations.map(r => r.playerId)); return players.filter(p => ids.has(p.id) && p.active) }, [players, relations])
-  const current = (id: string) => squad.find(s => s.playerId === id); const playerName = (id?: string) => id ? players.find(p => p.id === id)?.displayName ?? 'Jogador' : 'Equipa'
-  function toggle(player: Player) { const s = current(player.id); if (s) setSquad(squad.filter(x => x.playerId !== player.id)); else { const r = relations.find(x => x.playerId === player.id); setSquad([...squad, { id: createId(), matchId: selectedMatchId!, playerId: player.id, starter: false, captain: false, shirtNumber: r?.shirtNumber ?? player.shirtNumber, position: r?.position ?? player.position }]) } setSaved(false) }
-  function setField(playerId: string, field: 'starter' | 'captain') { setSquad(squad.map(s => s.playerId === playerId ? { ...s, [field]: !s[field] } : field === 'captain' && s.captain ? { ...s, captain: false } : s)); setSaved(false) }
-  async function saveSquad() { if (!db || !selectedMatchId) return; const database = db; await database.transaction('rw', database.matchSquads, async () => { await database.matchSquads.where('matchId').equals(selectedMatchId).delete(); if (squad.length) await database.matchSquads.bulkAdd(squad) }); setSaved(true); setOnCourt(squad.filter(s => s.starter).slice(0, 7).map(s => s.playerId)) }
-  async function addEvent(type: string, playerId?: string, result?: string) { if (!db || !selectedMatchId) return; const database = db; const event: MatchEvent = { id: createId(), matchId: selectedMatchId, timestampSeconds: clock, type, teamId: playerId ? selectedMatch!.teamId : undefined, playerId, result, createdAt: new Date().toISOString() }; await database.events.add(event); setEvents(v => [...v, event]); if (type === 'GOAL') { if (result === 'FOR') setOurScore(v => v + 1); else setOppScore(v => v + 1) } }
-  async function addCodingEvent(event: LiveCodingEvent) { if (!db || !selectedMatchId || !selectedMatch) return; const database = db; const matchEvent: MatchEvent = { id: event.id, matchId: selectedMatchId, timestampSeconds: event.timestampSeconds, type: event.action, teamId: selectedMatch.teamId, playerId: event.playerId, result: event.action === 'GOAL' ? 'FOR' : undefined, createdAt: new Date().toISOString() }; await database.events.add(matchEvent); setEvents(v => [...v, matchEvent]); if (event.action === 'GOAL') setOurScore(v => v + 1) }
-  async function add(e: React.FormEvent) { e.preventDefault(); if (!db || !teamId || !seasonId || !opponent.trim() || !date) return; const database = db; const now = new Date().toISOString(); await database.matches.add({ id: createId(), seasonId, competitionId: competitionId || undefined, teamId, opponentName: opponent.trim(), date, venue: venue.trim() || undefined, homeAway, status: 'PLANNED', createdAt: now, updatedAt: now }); setOpponent(''); setDate(''); setVenue(''); await load() }
-  async function remove(id: string) { if (db && window.confirm('Apagar este jogo?')) { const database = db; await database.matches.delete(id); await load(); if (selectedMatchId === id) setSelectedMatchId(null) } }
-  const teamName = (id: string) => teams.find(t => t.id === id)?.name ?? 'Equipa'; const seasonName = (id: string) => seasons.find(s => s.id === id)?.name ?? 'Época'; const competitionName = (id?: string) => id ? competitions.find(c => c.id === id)?.name : undefined
-  function swapPlayer(outId: string, inId: string) { if (!onCourt.includes(outId) || onCourt.includes(inId)) return; setOnCourt(onCourt.map(id => id === outId ? inId : id)); void addEvent('SUBSTITUTION_IN', inId); void addEvent('SUBSTITUTION_OUT', outId) }
-  const bench = squad.filter(s => !onCourt.includes(s.playerId))
+  const homeTeamId = selectedMatch?.teamId
+  const awayTeamId = selectedMatch?.opponentTeamId
+  const teamName = (id?: string) => id ? teams.find(t => t.id === id)?.name ?? 'Equipa' : 'Equipa'
+  const seasonName = (id: string) => seasons.find(s => s.id === id)?.name ?? 'Época'
+  const competitionName = (id?: string) => id ? competitions.find(c => c.id === id)?.name : undefined
+  const playerName = (id: string) => players.find(p => p.id === id)?.displayName ?? 'Jogador'
+  const relationFor = (playerId: string, teamId: string) => relations.find(r => r.playerId === playerId && r.teamId === teamId)
+  const playersForTeam = useMemo(() => (teamId?: string) => {
+    if (!teamId || !selectedMatch) return []
+    const ids = new Set(relations.filter(r => r.teamId === teamId).map(r => r.playerId))
+    return players.filter(p => p.active && ids.has(p.id))
+  }, [players, relations, selectedMatch])
+  const current = (playerId: string) => squad.find(s => s.playerId === playerId)
 
-  if (selectedMatch) return <main className="content standalonePage"><header className="topbar"><div><button onClick={() => { setSelectedMatchId(null); setLive(false) }}><ArrowLeft size={16}/> Voltar aos jogos</button><p className="eyebrow">FICHA DO JOGO</p><h1>{teamName(selectedMatch.teamId)} vs {selectedMatch.opponentName}</h1><p>{seasonName(selectedMatch.seasonId)}{competitionName(selectedMatch.competitionId) ? ` · ${competitionName(selectedMatch.competitionId)}` : ''} · {new Date(selectedMatch.date).toLocaleString('pt-PT')} · {selectedMatch.homeAway === 'HOME' ? 'Casa' : selectedMatch.homeAway === 'AWAY' ? 'Fora' : 'Neutro'}</p></div></header>{!live ? <><section className="section"><div className="sectionHeader"><div><p className="eyebrow">CONVOCATÓRIA</p><h2>Jogadores do jogo</h2><p>Seleciona os jogadores disponíveis e define titulares e capitão.</p></div><div style={{ display: 'flex', gap: 8 }}><MatchReportLink matchId={selectedMatch.id} /><button onClick={() => void saveSquad()}><Save size={17}/> {saved ? 'Guardado' : 'Guardar convocatória'}</button></div></div>{eligible.length === 0 ? <div className="emptyState"><strong>Nenhum jogador elegível</strong><span>Adiciona jogadores à equipa e época em Gestão antes de os convocar.</span></div> : <div className="localList">{eligible.map(player => { const s = current(player.id); return <article className="localRow" key={player.id} style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 12, alignItems: 'center' }}><label style={{ display: 'flex', gap: 10, alignItems: 'center' }}><input type="checkbox" checked={!!s} onChange={() => toggle(player)}/><span><strong>{player.displayName}</strong><small style={{ display: 'block', opacity: .7 }}>{player.position ?? '—'} · #{s?.shirtNumber ?? player.shirtNumber ?? '—'}</small></span></label><label>Inicial <input type="checkbox" disabled={!s} checked={!!s?.starter} onChange={() => setField(player.id, 'starter')}/></label><label>Capitão <input type="checkbox" disabled={!s} checked={!!s?.captain} onChange={() => setField(player.id, 'captain')}/></label></article> })}</div>}</section><section className="section"><div className="sectionHeader"><div><p className="eyebrow">LIVE MATCH</p><h2>Preparado para iniciar</h2><p>O jogo terá cronómetro de 30 minutos por parte, 7 jogadores em campo e banco para substituições.</p></div><button onClick={() => { if (onCourt.length === 7) setLive(true); else window.alert('Define exatamente 7 titulares antes de iniciar o Live Match.') }}><Play size={17}/> Iniciar Live Match</button></div></section></> : <section className="section"><div className="sectionHeader"><div><p className="eyebrow">LIVE MATCH · {period}.ª PARTE</p><h2>{teamName(selectedMatch.teamId)} {ourScore} — {oppScore} {selectedMatch.opponentName}</h2></div><div style={{ fontSize: 36, fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>{formatClock(clock)}</div></div><div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 18 }}><button onClick={() => setRunning(v => !v)}>{running ? <Pause size={17}/> : <Play size={17}/>} {running ? 'Pausar' : 'Iniciar'}</button><button onClick={() => { setRunning(false); setClock(0) }}><RotateCcw size={17}/> Reiniciar relógio</button><button onClick={() => { setRunning(false); setPeriod(2); setClock(0) }}>Terminar 1.ª parte</button></div><div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', gap: 16 }}><div><p className="eyebrow">7 EM CAMPO</p><div className="localList">{onCourt.map(id => <article className="localRow" key={id}><strong>{playerName(id)}</strong><span>{current(id)?.position ?? '—'} · #{current(id)?.shirtNumber ?? '—'}</span><button onClick={() => void addEvent('SHOT', id)}>Remate</button></article>)}</div><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}><button onClick={() => void addEvent('GOAL', undefined, 'FOR')}>⚽ Golo +1</button><button onClick={() => void addEvent('GOAL', undefined, 'AGAINST')}>🥅 Golo sofrido</button><button onClick={() => void addEvent('TURNOVER')}>↩ Perda</button><button onClick={() => void addEvent('STEAL')}>↗ Recuperação</button><button onClick={() => void addEvent('2MIN')}>2' Exclusão</button></div></div><div><p className="eyebrow">BANCO · SUBSTITUIÇÕES</p><div className="localList">{bench.map(s => <article className="localRow" key={s.playerId}><strong>{playerName(s.playerId)}</strong><span>{s.position ?? '—'} · #{s.shirtNumber ?? '—'}</span></article>)}</div><p style={{ opacity: .7, marginTop: 14 }}><ArrowLeftRight size={15}/> Para substituir, seleciona primeiro o jogador que sai e depois o jogador do banco.</p><div style={{ marginTop: 10 }}><select id="outPlayer"><option value="">Sai</option>{onCourt.map(id => <option key={id} value={id}>{playerName(id)}</option>)}</select><select id="inPlayer"><option value="">Entra</option>{bench.map(s => <option key={s.playerId} value={s.playerId}>{playerName(s.playerId)}</option>)}</select><button onClick={() => { const out = (document.getElementById('outPlayer') as HTMLSelectElement).value; const inn = (document.getElementById('inPlayer') as HTMLSelectElement).value; if (out && inn) swapPlayer(out, inn) }}>Substituir</button></div></div></div><LiveCoding players={onCourt.map(id => { const p = players.find(x => x.id === id); return p ? { id: p.id, displayName: p.displayName, shirtNumber: current(id)?.shirtNumber ?? p.shirtNumber, position: current(id)?.position ?? p.position } : null }).filter(Boolean) as { id: string; displayName: string; shirtNumber?: number; position?: string }[]} period={period} timestampSeconds={clock} onEvent={(event) => void addCodingEvent(event)} /><div style={{ marginTop: 20 }}><p className="eyebrow">EVENTOS RECENTES</p><div className="localList">{events.slice(-12).reverse().map(e => <article className="localRow" key={e.id}><strong>{formatClock(e.timestampSeconds)} · {e.type}</strong><span>{e.playerId ? playerName(e.playerId) : e.result === 'FOR' ? teamName(selectedMatch.teamId) : e.result === 'AGAINST' ? selectedMatch.opponentName : ''}</span></article>)}</div></div></section>}</main>
+  function toggle(player: Player, teamId: string) {
+    const existing = current(player.id)
+    if (existing) setSquad(squad.filter(s => s.playerId !== player.id))
+    else {
+      const r = relationFor(player.id, teamId)
+      setSquad([...squad, { id: createId(), matchId: selectedMatchId!, playerId: player.id, teamId, starter: false, captain: false, shirtNumber: r?.shirtNumber ?? player.shirtNumber, position: r?.position ?? player.position }])
+    }
+    setSaved(false)
+  }
 
-  return <main className="content standalonePage"><header className="topbar"><div><p className="eyebrow">CALENDÁRIO</p><h1>Jogos</h1><p>Planeamento dos jogos com dados guardados localmente.</p></div></header><section className="section"><form onSubmit={add} className="localForm"><select value={teamId} onChange={e => setTeamId(e.target.value)} required><option value="">Equipa</option>{teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select><select value={seasonId} onChange={e => { setSeasonId(e.target.value); setCompetitionId('') }} required><option value="">Época</option>{seasons.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select><select value={competitionId} onChange={e => setCompetitionId(e.target.value)}><option value="">Competição (opcional)</option>{seasonCompetitions.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select><input value={opponent} onChange={e => setOpponent(e.target.value)} placeholder="Adversário" required/><input value={date} onChange={e => setDate(e.target.value)} type="datetime-local" required/><input value={venue} onChange={e => setVenue(e.target.value)} placeholder="Pavilhão / local"/><select value={homeAway} onChange={e => setHomeAway(e.target.value as Match['homeAway'])}><option value="HOME">Casa</option><option value="AWAY">Fora</option><option value="NEUTRAL">Neutro</option></select><button type="submit"><Plus size={17}/> Criar jogo</button></form><div className="localList">{matches.length === 0 && <div className="emptyState"><Swords size={30}/><strong>Nenhum jogo</strong><span>Cria o primeiro jogo para começar a organizar a época.</span></div>}{matches.map(m => <article className="localRow" key={m.id}><button onClick={() => void openMatch(m.id)} style={{ flex: 1, textAlign: 'left', background: 'transparent', border: 0 }}><strong>{teamName(m.teamId)} vs {m.opponentName}</strong><span>{seasonName(m.seasonId)}{competitionName(m.competitionId) ? ` · ${competitionName(m.competitionId)}` : ''} · {new Date(m.date).toLocaleString('pt-PT')} · {m.homeAway === 'HOME' ? 'Casa' : m.homeAway === 'AWAY' ? 'Fora' : 'Neutro'} · {m.venue || 'Local por definir'}</span></button><button className="iconButton" onClick={() => remove(m.id)} aria-label="Apagar jogo"><Trash2 size={17}/></button></article>)}</div></section></main>
+  function setField(playerId: string, field: 'starter' | 'captain', teamId: string) {
+    setSquad(prev => prev.map(s => {
+      if (s.playerId === playerId) return { ...s, [field]: !s[field] }
+      if (field === 'captain' && s.teamId === teamId && s.captain) return { ...s, captain: false }
+      return s
+    }))
+    setSaved(false)
+  }
+
+  async function saveSquad() {
+    if (!db || !selectedMatchId) return
+    await db.transaction('rw', db.matchSquads, async () => {
+      await db.matchSquads.where('matchId').equals(selectedMatchId).delete()
+      if (squad.length) await db.matchSquads.bulkAdd(squad)
+    })
+    setSaved(true)
+  }
+
+  async function remove(id: string) {
+    if (!db || !window.confirm('Apagar este jogo?')) return
+    await db.matches.delete(id)
+    await db.matchSquads.where('matchId').equals(id).delete()
+    await db.events.where('matchId').equals(id).delete()
+    setSelectedMatchId(null)
+    await load()
+  }
+
+  function SquadEditor({ teamId, title }: { teamId?: string; title: string }) {
+    if (!teamId) return <div className="emptyState"><strong>Equipa não definida</strong><span>Este jogo não tem a segunda equipa associada. Abre-o novamente depois de atualizar os dados.</span></div>
+    const teamPlayers = playersForTeam(teamId)
+    return <section className="section"><div className="sectionHeader"><div><p className="eyebrow">PLANTEL · {title}</p><h2>{teamName(teamId)}</h2><p>Seleciona os jogadores desta equipa, titulares e capitão.</p></div></div>{teamPlayers.length === 0 ? <div className="emptyState"><strong>Nenhum jogador elegível</strong><span>Adiciona jogadores a esta equipa e época em Gestão.</span></div> : <div className="localList">{teamPlayers.map(player => { const s = current(player.id); return <article className="localRow" key={player.id} style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 12, alignItems: 'center' }}><label style={{ display: 'flex', gap: 10, alignItems: 'center' }}><input type="checkbox" checked={!!s} onChange={() => toggle(player, teamId)}/><span><strong>{player.displayName}</strong><small style={{ display: 'block', opacity: .7 }}>{player.position ?? '—'} · #{s?.shirtNumber ?? player.shirtNumber ?? '—'}</small></span></label><label>Inicial <input type="checkbox" disabled={!s} checked={!!s?.starter} onChange={() => setField(player.id, 'starter', teamId)}/></label><label>Capitão <input type="checkbox" disabled={!s} checked={!!s?.captain} onChange={() => setField(player.id, 'captain', teamId)}/></label></article> })}</div>}</section>
+  }
+
+  if (selectedMatch) return <main className="content standalonePage"><header className="topbar"><div><button onClick={() => setSelectedMatchId(null)}><ArrowLeft size={16}/> Voltar aos jogos</button><p className="eyebrow">JOGO CRIADO</p><h1>{teamName(homeTeamId)} vs {teamName(awayTeamId) || selectedMatch.opponentName}</h1><p>{seasonName(selectedMatch.seasonId)}{competitionName(selectedMatch.competitionId) ? ` · ${competitionName(selectedMatch.competitionId)}` : ''}{selectedMatch.phaseId ? ' · Fase associada' : ''}{selectedMatch.roundId ? ' · Jornada associada' : ''} · {new Date(selectedMatch.date).toLocaleString('pt-PT')}</p></div><div style={{ display: 'flex', gap: 8 }}><MatchReportLink matchId={selectedMatch.id}/><button onClick={() => void saveSquad()}><Save size={17}/> {saved ? 'Convocatórias guardadas' : 'Guardar convocatórias'}</button><button onClick={() => void remove(selectedMatch.id)}><Trash2 size={17}/> Apagar</button></div></header><SquadEditor teamId={homeTeamId} title="Equipa A"/><SquadEditor teamId={awayTeamId} title="Equipa B"/></main>
+
+  return <main className="content standalonePage"><header className="topbar"><div><p className="eyebrow">JOGOS</p><h1>Jogos criados</h1><p>Aqui aparecem apenas os jogos que já foram criados. Para criar um novo jogo utiliza <strong>Novo Jogo</strong>.</p></div></header><section className="section">{matches.length === 0 ? <div className="emptyState"><strong>Ainda não existem jogos</strong><span>Vai a Novo Jogo para criar o primeiro.</span></div> : <div className="localList">{matches.map(match => <article className="localRow" key={match.id} style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 12, alignItems: 'center' }}><button style={{ textAlign: 'left', background: 'transparent', border: 0, padding: 0 }} onClick={() => void openMatch(match.id)}><strong>{teamName(match.teamId)} {match.opponentTeamId ? `vs ${teamName(match.opponentTeamId)}` : `vs ${match.opponentName}`}</strong><span style={{ display: 'block', opacity: .7 }}>{seasonName(match.seasonId)}{competitionName(match.competitionId) ? ` · ${competitionName(match.competitionId)}` : ''} · {new Date(match.date).toLocaleString('pt-PT')}</span></button><span>{match.status}</span><button onClick={() => void remove(match.id)} title="Apagar"><Trash2 size={16}/></button></article>)}</div>}</section></main>
 }
